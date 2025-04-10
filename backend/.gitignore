@@ -1,0 +1,15 @@
+# Environment files
+.env
+.env.*
+env/
+venv/
+
+# Python cache and virtual environment
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+
+# Other common exclusions
+*.swp
+.DS_Store
