@@ -4,9 +4,9 @@ services:
     ports:
       - "5001:5001"
     volumes:
-      - .:/app
+      - ./backend:/backend
     environment:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
     env_file:
-      -.env
+      - ./backend/.env
