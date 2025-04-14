@@ -5,8 +5,10 @@ const remoteVideo = document.getElementById('remoteVideo');
 
 const roomInput = document.getElementById('room');
 const joinButton = document.getElementById('joinButton');
+const createButton = document.getElementById('createButton');
 const muteButton = document.getElementById('muteButton');
 const videoOffButton = document.getElementById('videoOffButton');
+const roomDisplay = document.getElementById('roomDisplay')
 
 // socket.emit('join', room)
 
@@ -52,10 +54,13 @@ function handlingICECandidate(event) {
     }
 }
 
-function handleRemoteStream(event) {
-    remoteVideo.srcObject = event.streams[0];
-    remoteStream = event.streams[0];
-}
+// function handleRemoteStream(event) {
+//     remoteVideo.srcObject = event.streams[0];
+//     remoteStream = event.streams[0];
+// }
+
+//Initailize webrtc
+
 
 async function startVideo(){
     try{
@@ -75,13 +80,31 @@ async function startVideo(){
     }
 }
 
-joinButton.addEventListener('click', () =>{
+function UpdateRoomDisplay() {
+    if (room) {
+        roomDisplay.textContent= `Current Room: ${room}`;
+        roomDisplay.style.display = 'block';
+    } else {
+        roomDisplay.style.display = 'none';
+    }
+}
+
+joinButton.addEventListener('click', () => {
+    if (!roomInput.value){
+        alert("Please enter a room id")
+        return;
+    };
     room = roomInput.value;
     socket.emit('join',room);
     startVideo().then(() => {
         createOffer();
+        UpdateRoomDisplay();
     });
 });
+
+createButton.addEventListener('click', () => {
+    socket.emit('create_room');
+})
 
 muteButton.addEventListener('click', () => {
     isMuted = !isMuted;
@@ -95,6 +118,20 @@ videoOffButton.addEventListener('click', () => {
     videoOffButton.textContent = isVideoOff ? 'Video Off' : 'Vide On'
 })
 
+//Socket event handler
+socket.on('room_created', (data) => {
+    room = data.room;
+    roomInput.value = room;
+
+    UpdateRoomDisplay();
+    startVideo.then(() =>{
+        console.log('Room created, waiting for other participants..')
+    });
+});
+
+socket.on('joined', () => {
+    console.log('Succesfully joined the room:', room);
+});
 
 socket.on('offer', async (offer) => {
     await startVideo();

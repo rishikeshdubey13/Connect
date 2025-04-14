@@ -9,7 +9,13 @@ body {
     background-color: #f4f4f4;
 }
 
-.h1 {
+.container {
+    width: 100%;
+    max-width: 1200px;
+    padding: 20px;
+}
+
+h1 {
     text-align: center;
     margin-bottom: 20px;
 }
@@ -18,25 +24,27 @@ body {
     display: flex;
     justify-content: center;
     gap: 20px;
+    flex-wrap: wrap;
 }
 
-.video-box {
+.video-wrapper {
     width: 400px;
     position: relative;
+    margin-bottom: 10px;
 }
 
 video {
     width: 100%;
     border-radius: 8px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    background-color: #000;
 }
 
-.video-controls {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
+.controls {
     display: flex;
+    justify-content: center;
     gap: 10px;
+    margin-top: 20px;
 }
 
 button {
@@ -52,13 +60,41 @@ button:hover {
     background-color: #0056b3;
 }
 
-.room-input {
+button.create {
+    background-color: #28a745;
+}
+
+button.create:hover {
+    background-color: #218838;
+}
+
+.room-controls {
     text-align: center;
     margin-bottom: 20px;
 }
 
-#room {
+input {
     padding: 8px;
     border-radius: 4px;
     border: 1px solid #ccc;
+    margin-right: 10px;
+    width: 200px;
+}
+
+.room-display {
+    text-align: center;
+    margin: 15px 0;
+    padding: 10px;
+    background-color: #e3f2fd;
+    border-radius: 4px;
+    font-weight: bold;
+    display: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.video-label {
+    text-align: center;
+    margin-top: 5px;
+    font-size: 14px;
+    color: #555;
 }

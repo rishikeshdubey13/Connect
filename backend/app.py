@@ -15,19 +15,20 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 rooms = set()
 
 def generate_room_id():
-    return str(uuid.uuid4())
+    return str(uuid.uuid4())[:8]
 
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# @socketio.on('create')
-# def create_room():
-#     roomId = generate_room_id()
-#     rooms.add(roomId)
-#     join_room(roomId)
-#     emit('room_joined',{'room':roomId})
+@socketio.on('create')
+def create_room():
+    roomId = generate_room_id()
+    rooms.add(roomId)
+    join_room(roomId)
+    emit('room_joined',{'room':roomId})
+    print(f"New room created: {roomId}")
 
 
 @socketio.on('join')
