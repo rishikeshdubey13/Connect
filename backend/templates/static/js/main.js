@@ -60,23 +60,48 @@ function handlingICECandidate(event) {
 // }
 
 //Initailize webrtc
+async function initializeWebRTC(){
+    if(peerConnection){
+        peerConnection.close();
+    }
+
+    peerConnection = new RTCPeerConnection(configuration);
+    if (localStream){
+        localStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track,localStream) //this make local media availavle to remote peer
+        });
+    }
+        peerConnection.onicecandidate = handlingICECandidate;
+
+        peerConnection.ontrack = event => {
+            console.log("Remote track received",event);
+            remoteVideo.srcObject = event.streams[0];
+            remoteVideo= event.streams[0];
+        };
+        return peerConnection;
+}
 
 
 async function startVideo(){
     try{
         localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
+        console.log('Media acces granted, setting up local Video')
         localVideo.srcObject = localStream;
 
-        peerConnection = new RTCPeerConnection(configuration)
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track,localStream)); //this make local media availavle to remote peer
-        
-        peerConnection.onicecandidate = handlingICECandidate;
-        peerConnection.ontrack = event => {
-            remoteVideo.srcObject = event.streams[0];
-            remoteStream =  evemt.streams[0];
-        };
+        await initializeWebRTC();
+
+        return true;
+
     } catch (error){
         console.error ("Error accesing media device:", error);
+
+        if (error.name === 'NotAllowedError') {
+            alert("Camera and microphone access denied. Please check your browser permissions.");
+        } else {
+            alert("Error accessing camera or microphone: " + error.message);
+        }
+        
+        return false;
     }
 }
 
@@ -89,30 +114,44 @@ function UpdateRoomDisplay() {
     }
 }
 
-joinButton.addEventListener('click', () => {
+joinButton.addEventListener('click', async() => {
     if (!roomInput.value){
         alert("Please enter a room id")
         return;
     };
     room = roomInput.value;
-    socket.emit('join',room);
-    startVideo().then(() => {
-        createOffer();
-        UpdateRoomDisplay();
-    });
+    UpdateRoomDisplay;
+
+    const started = await startVideo();
+    if (started){
+        socket.emit('join',room);
+    }
 });
 
-createButton.addEventListener('click', () => {
-    socket.emit('create_room');
+createButton.addEventListener('click', async() => {
+    const started = await startVideo();
+    if (started) {
+        socket.emit('create_room');
+    }
 })
 
 muteButton.addEventListener('click', () => {
+    if (!localStream) return;
+
+    const audiotracks = localStream.getAudioTracks;
+    if (audiotracks.length == 0) return;
+
     isMuted = !isMuted;
     localStream.getAudioTracks()[0].enabled = !isMuted
     muteButton.textContent = isMuted ? 'Unmute' : 'Mute'
 });
 
 videoOffButton.addEventListener('click', () => {
+    if (!localStream) return;
+    
+    const videotracks = localStream.getVideoTracks;
+    if (videotracks.length == 0) return;
+
     isVideoOff = !isVideoOff;
     localStream.getVideoTracks()[0].enabled = !isVideoOff
     videoOffButton.textContent = isVideoOff ? 'Video Off' : 'Vide On'
@@ -131,18 +170,31 @@ socket.on('room_created', (data) => {
 
 socket.on('joined', () => {
     console.log('Succesfully joined the room:', room);
+    //creating an offer if joining an existing room
+    if (peerConnection && localStream) {
+        setTimeout(() => {
+            createOffer();
+        }, 1000);
+    }
 });
 
 socket.on('offer', async (offer) => {
-    await startVideo();
+    console.log('Recieved offer');
+    if(!localStream){
+        await startVideo();
+    }
     await createAnswer(offer);
 });
 
 socket.on('answer', async (answer) => {
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    console.log("Received answer") 
+    if(peerConnection) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    }
 });
 
 socket.on('ice', async (ice) => {
+    console.log("Received ice candidate")
     if(peerConnection){
         try{
             await peerConnection.addIceCandidate(new RTCIceCandidate(ice))
