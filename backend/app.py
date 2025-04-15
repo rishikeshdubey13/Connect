@@ -22,20 +22,35 @@ def generate_room_id():
 def index():
     return render_template('index.html')
 
-@socketio.on('create')
+@socketio.on('create_room')
 def create_room():
     roomId = generate_room_id()
     rooms.add(roomId)
     join_room(roomId)
-    emit('room_joined',{'room':roomId})
+    emit('room_created',{'room':roomId})
     print(f"New room created: {roomId}")
 
 
+# @socketio.on('join')
+# def handle_join(room, callback=None):  # Add callback parameter
+#     if room not in rooms:
+#         if callback:
+#             callback({'error': 'Room does not exist'})
+#         return
+    
+#     join_room(room)
+#     if callback:
+#         callback({'status': 'success'})
+#     emit("joined", room=room)
+#     print(f"User joined room: {room}")
+
 @socketio.on('join')
 def handle_join(room):
+    if room not in rooms:
+        emit('join_error', {'error': 'Room does not exist'})
+        return
     join_room(room)
-    socketio.emit("joined", room=room)
-    print(f"User joind room: {room}")
+    emit("joined", room=room)
 
 # @socketio.on('leave')
 # def handle_leave(room):

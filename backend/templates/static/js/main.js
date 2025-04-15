@@ -24,7 +24,11 @@ let isVideoOff = false
 let room;
 
 const configuration = {
-    iceServers: [{urls: "stun:stun.l.google.com:19302" }]
+    iceServers: [
+        {urls: "stun:stun.l.google.com:19302"},
+        {urls: "stun:stun1.l.google.com:19302"},
+        {urls: "stun:stun2.l.google.com:19302"}
+      ]
 };
 
 async function createOffer() {
@@ -73,11 +77,28 @@ async function initializeWebRTC(){
     }
         peerConnection.onicecandidate = handlingICECandidate;
 
-        peerConnection.ontrack = event => {
-            console.log("Remote track received",event);
-            remoteVideo.srcObject = event.streams[0];
-            remoteVideo= event.streams[0];
+        peerConnection.oniceconnectionstatechange = () => {
+            console.log("ICE connection state:", peerConnection.iceConnectionState);
         };
+          
+        peerConnection.onsignalingstatechange = () => {
+            console.log("Signaling state:", peerConnection.signalingState);
+        };
+
+        peerConnection.ontrack = event => {
+            console.log("Remote track received:", event.track.kind);
+            console.log("Streams array length:", event.streams.length);
+            if (event.streams[0]) {
+              console.log("Setting remote stream");
+              remoteVideo.srcObject = event.streams[0];
+              remoteStream = event.streams[0];
+              
+              // Force a re-render of the video element
+              remoteVideo.load();
+            } else {
+              console.error("No stream received in track event");
+            }
+          };
         return peerConnection;
 }
 
@@ -120,11 +141,18 @@ joinButton.addEventListener('click', async() => {
         return;
     };
     room = roomInput.value;
-    UpdateRoomDisplay;
+    UpdateRoomDisplay();
 
     const started = await startVideo();
     if (started){
-        socket.emit('join',room);
+        socket.emit('join', room);
+
+        // socket.emit('join',room,(response) => {
+        //     if (response && response.error) {
+        //         alert(response.error);
+        //         return;
+        //     }
+        // });
     }
 });
 
@@ -138,7 +166,7 @@ createButton.addEventListener('click', async() => {
 muteButton.addEventListener('click', () => {
     if (!localStream) return;
 
-    const audiotracks = localStream.getAudioTracks;
+    const audiotracks = localStream.getAudioTracks();
     if (audiotracks.length == 0) return;
 
     isMuted = !isMuted;
@@ -149,7 +177,7 @@ muteButton.addEventListener('click', () => {
 videoOffButton.addEventListener('click', () => {
     if (!localStream) return;
     
-    const videotracks = localStream.getVideoTracks;
+    const videotracks = localStream.getVideoTracks();
     if (videotracks.length == 0) return;
 
     isVideoOff = !isVideoOff;
@@ -157,18 +185,24 @@ videoOffButton.addEventListener('click', () => {
     videoOffButton.textContent = isVideoOff ? 'Video Off' : 'Vide On'
 })
 
+socket.on('join_error', (data) => {
+    alert(data.error);
+});
+
 //Socket event handler
-socket.on('room_created', (data) => {
+socket.on('room_created', async (data) => {
     room = data.room;
     roomInput.value = room;
 
     UpdateRoomDisplay();
-    startVideo.then(() =>{
-        console.log('Room created, waiting for other participants..')
-    });
+    // startVideo.then(() => {
+    //     console.log('Room created, waiting for other participants..')
+    // });
+    await startVideo();
+    console.log('Room created, waiting for other participants..')
 });
 
-socket.on('joined', () => {
+socket.on('room_joined', () => {
     console.log('Succesfully joined the room:', room);
     //creating an offer if joining an existing room
     if (peerConnection && localStream) {
@@ -178,8 +212,16 @@ socket.on('joined', () => {
     }
 });
 
+socket.on('joined', () => {
+    console.log("Joined room, checking peerconnection state:", peerConnection?.conneectionState);
+    if (peerConnection && localStream) {
+        console.log("Creating offer..")
+        createOffer();
+    }
+});
+
 socket.on('offer', async (offer) => {
-    console.log('Recieved offer');
+    console.log('Recieved offer,',offer);
     if(!localStream){
         await startVideo();
     }
@@ -187,14 +229,14 @@ socket.on('offer', async (offer) => {
 });
 
 socket.on('answer', async (answer) => {
-    console.log("Received answer") 
+    console.log("Received answer", answer) 
     if(peerConnection) {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
     }
 });
 
 socket.on('ice', async (ice) => {
-    console.log("Received ice candidate")
+    console.log("Received ice candidate", ice)
     if(peerConnection){
         try{
             await peerConnection.addIceCandidate(new RTCIceCandidate(ice))
