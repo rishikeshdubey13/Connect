@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template,request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from dotenv import load_dotenv
 import os
@@ -12,7 +12,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 
 #store active rooms
-rooms = set()
+rooms = {}
 
 def generate_room_id():
     return str(uuid.uuid4())[:8]
@@ -24,11 +24,12 @@ def index():
 
 @socketio.on('create_room')
 def create_room():
-    roomId = generate_room_id()
-    rooms.add(roomId)
-    join_room(roomId)
-    emit('room_created',{'room':roomId})
-    print(f"New room created: {roomId}")
+    room_id = generate_room_id()
+    rooms[room_id] = set()
+    join_room(room_id)
+    rooms[room_id].add(request.sid)
+    emit('room_created',{'room':room_id})
+    print(f"New room created: {room_id}")
 
 
 # @socketio.on('join')
@@ -50,13 +51,18 @@ def handle_join(room):
         emit('join_error', {'error': 'Room does not exist'})
         return
     join_room(room)
+    rooms[room].add(request.sid)
+    print(f"User {request.sid} has joined the room")
     emit("joined", room=room)
 
-# @socketio.on('leave')
-# def handle_leave(room):
-#     leave_room(room)
-#     if room in rooms:
-#         socketio.emit('user_left',room =room, include_self=False)
+@socketio.on('leave')
+def handle_leave(room):
+    leave_room(room)
+    if room in rooms:
+        rooms[room].discard(request.sid)
+        if not rooms[room]:
+            del rooms[room]
+        # socketio.emit('user_left',room =room, include_self=False)
 
 @socketio.on('offer')
 def handle_offer(offer,room):
@@ -73,7 +79,13 @@ def handle_ice(ice, room):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print("User disconnected")
+    for room, particpants in rooms.items():
+        if request.sid in particpants:
+            particpants.remove(request.sid)
+            emit('user_left', room = room,include_self=False) 
+            print("User disconnected")
+            if not particpants:
+                del rooms[room]
 
 
 # @app.route('/conference/<room_id>')
