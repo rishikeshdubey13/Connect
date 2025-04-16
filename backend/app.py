@@ -22,6 +22,11 @@ def generate_room_id():
 def index():
     return render_template('index.html')
 
+@socketio.on_error_default
+def default_error_handler(e):
+    print(f"Socket error: {str(e)}")
+    emit('error', {'message': 'An unexpected error occurred'})
+
 @socketio.on('create_room')
 def create_room():
     room_id = generate_room_id()
@@ -65,27 +70,33 @@ def handle_leave(room):
         # socketio.emit('user_left',room =room, include_self=False)
 
 @socketio.on('offer')
-def handle_offer(offer,room):
-    socketio.emit('offer',offer, room = room,include_self=False)
+def handle_offer(offer, room):
+    # Add logging to debug
+    print(f"Received offer for room {room}, forwarding to other participants")
+    socketio.emit('offer', offer, room=room, include_self=False)
 
 @socketio.on('answer')
 def handle_answer(answer, room):
-    socketio.emit('answer', answer, room = room, include_self= False)
+    # Add logging to debug
+    print(f"Received answer for room {room}, forwarding to other participants")
+    socketio.emit('answer', answer, room=room, include_self=False)
 
 @socketio.on('ice')
 def handle_ice(ice, room):
-    socketio.emit('ice',ice, room = room, include_self=False)
+    # Add logging to debug
+    print(f"Received ICE candidate for room {room}, forwarding to other participants")
+    socketio.emit('ice', ice, room=room, include_self=False)
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    for room, particpants in rooms.items():
-        if request.sid in particpants:
-            particpants.remove(request.sid)
-            emit('user_left', room = room,include_self=False) 
-            print("User disconnected")
-            if not particpants:
-                del rooms[room]
+    for room_id, participants in list(rooms.items()):
+        if request.sid in participants:
+            participants.discard(request.sid)
+            emit('user_left', room=room_id, include_self=False)
+            print(f"User disconnected from room: {room_id}")
+            if not participants:
+                del rooms[room_id]  # Delete empty room
 
 
 # @app.route('/conference/<room_id>')
