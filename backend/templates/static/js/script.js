@@ -29,4 +29,13 @@ function sendMessage(message){
 
 sendMessage({type:'hello', content: 'World!'});
 
-//CREATE RTC PEER CONNECTION
+//configuration of ICE servers
+const configuration={
+    iceservers:[
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" }
+    ]
+}
+
+//create a new rtc peer connection
+const peerConnection = new RTCPeerConnection(configuration);
