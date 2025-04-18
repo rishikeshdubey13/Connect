@@ -235,4 +235,31 @@ function cleanUp(){
     console.log("Call ended and resources cleaned up.");
 
 }
-    
+
+function sendChat() {
+    const msg = document.getElementById('chatInput').value.trim();
+    if (!msg || !socket) return;
+
+    socket.emit('chat', { room: room, message: msg, sender: peerid });
+    addMessage(`You: ${msg}`);
+    document.getElementById('chatInput').value = '';
+}
+
+function addMessage(text) {
+    const messagesDiv = document.getElementById('messages');
+    const msgElem = document.createElement('div');
+    msgElem.textContent = text;
+    messagesDiv.appendChild(msgElem);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+
+
+//Receive chat messages
+if (socket) {
+    socket.on('chat', data => {
+        if (data.sender !== peerid) {
+            addMessage(`Peer: ${data.message}`);
+        }
+    });
+}

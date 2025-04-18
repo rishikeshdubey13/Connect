@@ -43,6 +43,13 @@ def handle_leave(room):
     print(f"A User left room: {room}")
     emit('leave', room = room, include_self=False)
 
+
+@socketio.on('chat')
+def handle_chat(data):
+    room = data['room']
+    emit('chat', data, room=room)
+
+
     
 if __name__ ==  '__main__':
     socketio.run(app, host = "0.0.0.0", port = 5001, debug=True)

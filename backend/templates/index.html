@@ -38,6 +38,15 @@
             <video id="remoteVideo" autoplay playsinline></video>
         </div>
     </div>
+
+    <div id="chatBox">
+        <h3>Chat</h3>
+        <div id="messages" style="height: 200px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px;"></div>
+        <input id="chatInput" type="text" placeholder="Type a message..." />
+        <button onclick="sendChat()">Send</button>
+    </div>
+    
+    
     
 
     <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
