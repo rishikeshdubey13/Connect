@@ -11,3 +11,4 @@ services:
       - FLASK_DEBUG=1
     env_file:
       - ./backend/.env
+    
