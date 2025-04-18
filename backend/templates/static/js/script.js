@@ -1,18 +1,12 @@
-const socket = io(); //Connect flask-socketio server
-
-const peerid = Math.floor(Math.random()*1000000); //Generate a random peer id
-console.log('Peer ID:', peerid); //Log the peer id
-
-socket.on('connect', () => {
-    console.log('Connected to server')
-});
+let socket;
+let room = ""
+let peerid = Math.floor(Math.random()*1000000); //Generate a random peer id
 let mediaready = false; //Flag to check if the media is ready
 let iscaller = false; //Flag to check if the user is the caller
 let localStream;
 let peerConnection;
 let pendingMessages = []; //Array to store pending messages
 
-//configuration of ICE servers
 const config={
     iceServers:[
         { urls: "stun:stun.l.google.com:19302" },
@@ -20,29 +14,53 @@ const config={
     ]
 }
 
-const room  ='testroom'; //Room name
-socket.emit('join', room); //Join the room
+//Moving everything to the joinRoom function
+
+function joinRoom() {
+    room = document.getElementById('roomInput').value.trim(); //trim the input to remove any extra spaces
+    if(!room) return alert("Please enter a room name");
+
+    document.getElementById('joinForm').style.display = 'none'; //Hide the join form
+    document.getElementById('videoSection').style.display = 'block'; //Show the video section
+    document.getElementsByName('roomName').innerText = room; //Set the room name in the video section
+
+    socket = io(); //Connect to the socket server
+
+    socket.on('connect', () => {
+        console.log("Connected to server");
+        socket.emit('join', room);
+    });
+
+    socket.on('created',() =>{
+        console.log('Room created');
+        iscaller =true; //Set the caller flag to true
+    });
+
+    socket.on('joined', () => {
+        console.log('Another peer joined the room.');
+
+        // If you're the caller, this means someone is now in the room, so start call
+        if (iscaller && mediaready) {
+            console.log('Caller starting call after peer joined.');
+            startCall();
+        }
+    });
+    //signalling (handle incoming messages)
+    //message event handler
+    socket.on('message',async (message) => {
+        if (message.sender === peerid) return; //Ignore the message if it is sent by the same peer
+        console.log('Message received:', message);
+
+        if(!mediaready){
+            pendingMessages.push(message); //save for later
+        }else {
+            handleMessage(message);
+        }
+    });
 
 
-socket.on('created',() =>{
-    console.log('Room created');
-    iscaller =true; //Set the caller flag to true
-});
-
-socket.on('joined', () => {
-    console.log('Another peer joined the room.');
-
-    // If you're the caller, this means someone is now in the room, so start call
-    if (iscaller && mediaready) {
-        console.log('Caller starting call after peer joined.');
-        startCall();
-    }
-});
-
-
-
-//To access the local media devices
-navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    //To access the local media devices
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
     .then(stream => {
         localStream = stream;
         document.getElementById('localVideo').srcObject = stream;
@@ -65,7 +83,8 @@ navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         console.error("Error accessing media devices: ", err);
         alert("Error accessing media devices: " + err);
     });
-
+    
+}
 
 
 //helper: ensure peer connection is setup and exists
@@ -102,29 +121,8 @@ function ensurePeerConnection() {
                 console.log("All ICE candidates sent.");
             }
         };
-        
-
-        // peerConnection.onicecandidate = (event) => {
-        //     if (event.candidate) {
-        //         sendMessage({ type: 'ice-candidate', candidate: event.candidate });
-        //     }
-        // };
     }
 }
-
-
-//signalling (handle incoming messages)
-//message event handler
-socket.on('message',async (message) => {
-    if (message.sender === peerid) return; //Ignore the message if it is sent by the same peer
-    console.log('Message received:', message);
-
-    if(!mediaready){
-        pendingMessages.push(message); //save for later
-    }else {
-        handleMessage(message);
-    }
-});
 
 //handle incoming messages
 async function handleMessage(message){

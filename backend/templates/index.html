@@ -1,57 +1,39 @@
-<!-- <!DOCTYPE html>
-<html>
-<head>
-    <title>Video Conference</title>
-    <link href="static/css/style.css" rel ="stylesheet">
-</head>
-<body>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>Video Conference</h1>
-            </div>
-            
-            <div class="room-controls">
-                <input type="text" id="room" placeholder="Enter Room ID">
-                <button id="joinButton">Join Room</button>
-                <button id="createButton" class="create">Create New Room</button>
-            </div>
-            
-            <div id="roomDisplay" class="room-display"></div>
-            
-            <div class="video-container">
-                <div class="video-wrapper">
-                    <video id="localVideo" autoplay muted playsinline></video>
-                    <p>Local Video</p>
-                </div>
-                <div class="video-wrapper">
-                    <video id="remoteVideo" autoplay playsinline></video>
-                    <p>Remote Video</p>
-                </div>
-            </div>
-            
-            <div class="controls">
-                <button id="muteButton">Mute</button>
-                <button id="videoOffButton">Video Off</button>
-            </div>
-        </div>
-    
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-        <script src="static/js/script.js"></script>
-    </body>
-</body>
-</html> -->
-
-
 <!DOCTYPE html>
 <html>
 <head>
     <title>Video Chat</title>
+    <style>
+        video {
+            width: 45%;
+            height: auto;
+            border: 2px solid black;
+            margin: 10px;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .video-container {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
 </head>
 <body>
-    <h1>Simple Video Call</h1>
-    <video id="localVideo" autoplay muted></video>
-    <video id="remoteVideo" autoplay></video>
+    <h1>join Video Call</h1>
+    <div id = 'joinForm'>
+        <input type = 'text' id="roomInput" placeholder="Enter room name">
+        <button onclick="joinRoom()">JoinRoom</button>
+    </div>
+    <div id = "videoSection" style="display: none;">
+        <h2>Room: <span id="roomName"></span></h2>
+        <div class="video-container">
+            <video id="localVideo" autoplay muted playsinline></video>
+            <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+    </div>
+    
 
     <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
