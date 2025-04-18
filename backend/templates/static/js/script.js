@@ -26,6 +26,15 @@ function joinRoom() {
 
     socket = io(); //Connect to the socket server
 
+    if (socket) {
+        socket.on('leave', () => {
+            console.log("Other peer has left the call.");
+            alert("The other person has left the call.");
+            cleanUp();
+        });
+    }
+    
+
     socket.on('connect', () => {
         console.log("Connected to server");
         socket.emit('join', room);
@@ -161,3 +170,69 @@ async function startCall() {
     await peerConnection.setLocalDescription(offer);
     sendMessage({ type: 'offer', offer: offer });
 }
+function toggleMute(){
+    if(!localStream) return;
+
+    const audioTracks = localStream.getAudioTracks()[0];
+    if(!audioTracks) return alert("No auidio tracks found");
+
+    audioTracks.enabled = !audioTracks.enabled; //Toggle the audio track
+    document.getElementById('muteBtn').innerText = audioTracks.enabled ? "Mute":"Unmute";
+}
+
+function toggleVideo(){
+    if(!localStream) return;
+
+    const videoTracks = localStream.getVideoTracks()[0];
+    if(!videoTracks) return alert("No video tracks found");
+
+    videoTracks.enabled = !videoTracks.enabled; //Toggle the video track
+    document.getElementById('videoBtn').innerText = videoTracks.enabled ? "Turn Camera Off" : "Turn Camera On";
+}
+
+function hangUp(){
+    console.log("hanging up...");
+
+    if (socket && socket.connected) {
+        socket.emit('leave', room);
+        socket.disconnect();
+        socket = null;
+    }
+    cleanUp();
+}
+
+function cleanUp(){
+    //stop the local stream
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+
+    //close peer connection
+    if(peerConnection){
+        peerConnection.close();
+        peerConnection = null;
+    }
+
+    //remove video streams
+    document.getElementById('localVideo').srcObject = null;
+    document.getElementById('remoteVideo').srcObject = null;
+
+    //reset the flags
+    mediaready = false;
+    iscaller =false;
+    pendingMessages = [];
+
+    //reset the socket
+    if(socket){
+        socket.disconnect();
+        socket = null;
+    }
+
+    //reset the UI
+    document.getElementById('videoSection').style.display = "none";
+    document.getElementById('joinForm').style.display = "block";
+    document.getElementById('roomInput').value = "";
+
+    console.log("Call ended and resources cleaned up.");
+
+}
+    

@@ -28,6 +28,11 @@
     </div>
     <div id = "videoSection" style="display: none;">
         <h2>Room: <span id="roomName"></span></h2>
+        <div>
+            <button id ="muteBtn" onclick = "toggleMute()">Mute</button>
+            <button id = "videoBtn" onclick = "toggleVideo()">Turn camera off</button>
+            <button id = "hangUpBtn" onclick = "hangUp()">Hang up</button>
+        </div>
         <div class="video-container">
             <video id="localVideo" autoplay muted playsinline></video>
             <video id="remoteVideo" autoplay playsinline></video>

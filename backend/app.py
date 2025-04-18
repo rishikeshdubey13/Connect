@@ -38,6 +38,12 @@ def handle_message(payload):
     print(f"Message from room {room}: {data}")
     socketio.emit('message', data, room=room)
 
+@socketio.on('leave')
+def handle_leave(room):
+    print(f"A User left room: {room}")
+    emit('leave', room = room, include_self=False)
+
+    
 if __name__ ==  '__main__':
     socketio.run(app, host = "0.0.0.0", port = 5001, debug=True)
     
