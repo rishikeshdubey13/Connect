@@ -1,0 +1,26 @@
+# services:
+#   web:
+#     build: .
+#     ports:
+#       - "5001:5001"
+#     volumes:
+#       - ./backend:/backend
+
+#     environment:
+#       - FLASK_ENV=development
+#       - FLASK_DEBUG=1
+#     env_file:
+#       - ./backend/.env
+
+services:
+  frontend:
+    build: ./frontend-services
+    ports:
+      - "3000:3000"
+    depends_on:
+      - signaling
+
+  signaling:
+    build: ./signalling-services
+    ports:
+      - "5001:5001"

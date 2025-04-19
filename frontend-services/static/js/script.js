@@ -24,7 +24,8 @@ function joinRoom() {
     document.getElementById('videoSection').style.display = 'block'; //Show the video section
     document.getElementsByName('roomName').innerText = room; //Set the room name in the video section
 
-    socket = io(); //Connect to the socket server
+    socket = io("http://localhost:5001");
+    //Connect to the socket server
 
     if (socket) {
         socket.on('leave', () => {

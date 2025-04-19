@@ -13,7 +13,7 @@ rooms = {}
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return "Signaling Service Running"
 
 @socketio.on('join')
 def handle_join(room):
