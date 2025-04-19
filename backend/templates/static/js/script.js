@@ -67,6 +67,13 @@ function joinRoom() {
         }
     });
 
+    socket.on('chat', data => {
+        if (data.sender !== peerid) {
+            console.log("Chat received:", data);
+            addMessage(`Peer: ${data.message}`);
+        }
+    });
+
 
     //To access the local media devices
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
@@ -239,6 +246,8 @@ function cleanUp(){
 function sendChat() {
     const msg = document.getElementById('chatInput').value.trim();
     if (!msg || !socket) return;
+
+    console.log("Sending chat message:", msg);
 
     socket.emit('chat', { room: room, message: msg, sender: peerid });
     addMessage(`You: ${msg}`);

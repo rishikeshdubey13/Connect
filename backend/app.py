@@ -47,6 +47,7 @@ def handle_leave(room):
 @socketio.on('chat')
 def handle_chat(data):
     room = data['room']
+    print(f"Chat message from room {room}: {data}")
     emit('chat', data, room=room)
 
 
