@@ -1,0 +1,11 @@
+flask
+flask-login
+flask-sqlalchemy
+flask-migrate
+psycopg2
+email-validator
+python-dotenv
+flask_bcrypt
+wtforms
+flask-wtf
+pyjwt
