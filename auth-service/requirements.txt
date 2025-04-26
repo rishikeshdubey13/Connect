@@ -2,10 +2,12 @@ flask
 flask-login
 flask-sqlalchemy
 flask-migrate
-psycopg2
+psycopg2-binary
 email-validator
 python-dotenv
 flask_bcrypt
 wtforms
 flask-wtf
 pyjwt
+werkzeug
+flask-cors

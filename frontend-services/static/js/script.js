@@ -1,5 +1,6 @@
+let username = "";
 let socket;
-let room = ""
+let room = "";
 let peerid = Math.floor(Math.random()*1000000); //Generate a random peer id
 let mediaready = false; //Flag to check if the media is ready
 let iscaller = false; //Flag to check if the user is the caller
@@ -250,7 +251,7 @@ function sendChat() {
 
     console.log("Sending chat message:", msg);
 
-    socket.emit('chat', { room: room, message: msg, sender: peerid });
+    socket.emit('chat', { room: room, message: msg, sender: username });
     addMessage(`You: ${msg}`);
     document.getElementById('chatInput').value = '';
 }
@@ -268,8 +269,60 @@ function addMessage(text) {
 //Receive chat messages
 if (socket) {
     socket.on('chat', data => {
-        if (data.sender !== peerid) {
-            addMessage(`Peer: ${data.message}`);
+        if (data.sender !== username) {
+            addMessage(`{data.sender}: ${data.message}`);
         }
     });
 }
+
+
+const AUTH_API = "http://localhost:5002"; // auth-service
+
+function register() {
+    const u = document.getElementById("usernameInput").value;
+    const p = document.getElementById("passwordInput").value;
+    if (!u || !p) {
+        alert("Please enter both username and password.");
+        return;
+    }
+    fetch("http://localhost:5002/register", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ username: u, password: p })
+    }).then(res => res.json())
+      .then(data => {
+          if (data.message) {
+              document.getElementById("authMsg").innerText = "Registered successfully. Please log in.";
+          } else {
+              document.getElementById("authMsg").innerText = data.error || "Error during registration.";
+          }
+      });
+}
+
+function login() {
+    const u = document.getElementById("usernameInput").value;   
+    const p = document.getElementById("passwordInput").value;
+    if (!u || !p) {
+        alert("Please enter both username and password.");
+        return;
+    }
+    fetch("http://localhost:5002/login", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ username: u, password: p })
+    }).then(res => res.json())
+      .then(data => {
+          if (data.message === "Login successful") {
+              username = u;
+              document.getElementById("authSection").style.display = "none";
+              document.getElementById("mainApp").style.display = "block";
+          } else {
+              document.getElementById("authMsg").innerText = data.error || "Login failed.";
+          }
+      });
+}
+

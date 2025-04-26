@@ -1,17 +1,3 @@
-# services:
-#   web:
-#     build: .
-#     ports:
-#       - "5001:5001"
-#     volumes:
-#       - ./backend:/backend
-
-#     environment:
-#       - FLASK_ENV=development
-#       - FLASK_DEBUG=1
-#     env_file:
-#       - ./backend/.env
-
 services:
   frontend:
     build: ./frontend-services
@@ -19,8 +5,28 @@ services:
       - "3000:3000"
     depends_on:
       - signaling
+      - auth
 
   signaling:
     build: ./signalling-services
     ports:
       - "5001:5001"
+
+  auth:
+    build: ./auth-service
+    ports:
+      - "5002:5002"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:Zompire%4017@db:5432/authdb
+   
+
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Zompire@17
+      POSTGRES_DB: authdb
+    ports:
+      - "5432:5432"
