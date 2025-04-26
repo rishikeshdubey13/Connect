@@ -252,7 +252,7 @@ function sendChat() {
     console.log("Sending chat message:", msg);
 
     socket.emit('chat', { room: room, message: msg, sender: username });
-    addMessage(`You: ${msg}`);
+    // addMessage(`You: ${msg}`);
     document.getElementById('chatInput').value = '';
 }
 
