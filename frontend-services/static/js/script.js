@@ -15,6 +15,15 @@ const config={
     ]
 }
 
+
+window.onload  = () => {
+    const token = localStorage.getItem("token");
+    if (token) {
+        fetchMe();
+        document.getElementById("authSection").style.display = "block";
+        document.getElementById("mainApp").style.display = "none";
+}
+};
 //Moving everything to the joinRoom function
 
 function joinRoom() {
@@ -23,7 +32,7 @@ function joinRoom() {
 
     document.getElementById('joinForm').style.display = 'none'; //Hide the join form
     document.getElementById('videoSection').style.display = 'block'; //Show the video section
-    document.getElementsByName('roomName').innerText = room; //Set the room name in the video section
+    document.getElementById('roomName').innerText = room; //Set the room name in the video section
 
     socket = io("http://localhost:5001");
     //Connect to the socket server
@@ -69,12 +78,19 @@ function joinRoom() {
         }
     });
 
-    socket.on('chat', data => {
-        if (data.sender !== peerid) {
-            console.log("Chat received:", data);
-            addMessage(`Peer: ${data.message}`);
-        }
-    });
+    // socket.on('chat', data => {
+    //     if (data.sender !== peerid) {
+    //         console.log("Chat received:", data);
+    //         addMessage(`Peer: ${data.message}`);
+    //     }
+    // });
+    if (socket) {
+        socket.on('chat', data => {
+            if (username && data.sender !== username) {
+                addMessage(`${data.sender}: ${data.message}`);
+            }
+        });
+    }
 
 
     //To access the local media devices
@@ -252,7 +268,7 @@ function sendChat() {
     console.log("Sending chat message:", msg);
 
     socket.emit('chat', { room: room, message: msg, sender: username });
-    // addMessage(`You: ${msg}`);
+    addMessage(`You: ${msg}`);
     document.getElementById('chatInput').value = '';
 }
 
@@ -265,15 +281,6 @@ function addMessage(text) {
 }
 
 
-
-//Receive chat messages
-if (socket) {
-    socket.on('chat', data => {
-        if (data.sender !== username) {
-            addMessage(`{data.sender}: ${data.message}`);
-        }
-    });
-}
 
 
 const AUTH_API = "http://localhost:5002"; // auth-service
@@ -297,7 +304,7 @@ function register() {
               document.getElementById("authMsg").innerText = "Registered successfully. Please log in.";
           } else {
               document.getElementById("authMsg").innerText = data.error || "Error during registration.";
-          }
+          } 
       });
 }
 
@@ -317,7 +324,10 @@ function login() {
     }).then(res => res.json())
       .then(data => {
           if (data.message === "Login successful") {
-              username = u;
+              username = data.username || u; // Set username from server response or input
+              localStorage.setItem("token", data.token); //Store the token in local storage
+
+              document.getElementById("roomUsername").innerText = username;
               document.getElementById("authSection").style.display = "none";
               document.getElementById("mainApp").style.display = "block";
           } else {
@@ -325,4 +335,35 @@ function login() {
           }
       });
 }
+function fetchMe() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    fetch("http://localhost:5002/me", {
+        method: "GET",
+        headers: {
+            "Authorization": "Bearer " + token
+        }
+    })
+    .then(res => {
+        if (!res.ok) {
+            throw new Error("Unauthorized");
+        }
+        return res.json();
+    })
+    .then(data => {
+        console.log("Logged in as:", data.username);
+        // you can update UI here
+    })
+    .catch(err => {
+        console.error(err);
+        logout();
+    });
+}
+
+function logout() {
+    localStorage.removeItem("token");
+    location.reload(); // refresh page to go back to login
+}
+
 

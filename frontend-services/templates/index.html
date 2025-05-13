@@ -32,14 +32,17 @@
     </div>
 
     
-    <div id = "mainApp">
-        <h3>join Video Call</h3>
+    <div id = "mainApp" style ="display: none;">
+        <h1>Video Chat Application</h1>
+        <h2>Welcome, <span id ="roomUsername"></span></h2>
+
         <div id = 'joinForm'>
             <input type = 'text' id="roomInput" placeholder="Enter room name">
-            <button onclick="joinRoom()">JoinRoom</button>
+            <button onclick="joinRoom()">Join Room</button>
         </div>
+
         <div id = "videoSection" style="display: none;">
-            <h2>Room: <span id="roomName"></span></h2>
+            <h3>Room: <span id="roomName"></span></h3>
             <div>
                 <button id ="muteBtn" onclick = "toggleMute()">Mute</button>
                 <button id = "videoBtn" onclick = "toggleVideo()">Turn camera off</button>

@@ -11,3 +11,4 @@ flask-wtf
 pyjwt
 werkzeug
 flask-cors
+flask_jwt_extended
