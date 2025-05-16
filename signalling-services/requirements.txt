@@ -4,4 +4,9 @@ eventlet
 flask-cors
 flask-socketio==5.3.2
 python-dotenv==1.0.0
-jwt
+PyJWT
+flask-socketio 
+flask-cors 
+flask-sqlalchemy 
+psycopg2-binary 
+python-dotenv

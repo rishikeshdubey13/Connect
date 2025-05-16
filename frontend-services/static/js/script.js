@@ -8,12 +8,15 @@ let localStream;
 let peerConnection;
 let pendingMessages = []; //Array to store pending messages
 
-const config={
-    iceServers:[
+const config = {
+    iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" }
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" }
     ]
-}
+};
 
 
 window.onload  = () => {
@@ -34,7 +37,17 @@ function joinRoom() {
     document.getElementById('videoSection').style.display = 'block'; //Show the video section
     document.getElementById('roomName').innerText = room; //Set the room name in the video section
 
-    socket = io("http://localhost:5001");
+
+    const isDocker = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+    const SIGNALING_URL = isDocker ? 'http://signaling:5001' : 'http://localhost:5001';
+    socket = io(SIGNALING_URL);
+
+    // socket = io("http://signaling:5001");  // Use service name in Docker
+    // const isDocker = window.location.hostname !== 'localhost';
+    // const SIGNALING_URL = isDocker ? 'http://signaling:5001' : 'http://localhost:5001';
+    // socket = io(SIGNALING_URL);
+
+    
     //Connect to the socket server
 
     if (socket) {
@@ -47,8 +60,10 @@ function joinRoom() {
     
 
     socket.on('connect', () => {
-        console.log("Connected to server");
-        socket.emit('join', room);
+        console.log("Connected to server with socket ID:", socket.id);
+        const joinData = { room: room, token: localStorage.getItem("token")};
+        console.log("Join Data:", joinData)
+        socket.emit('join', joinData); //Join the room
     });
 
     socket.on('created',() =>{
@@ -134,6 +149,7 @@ function ensurePeerConnection() {
         peerConnection.ontrack = (event) => {
             console.log("Remote track received:", event);
             
+
             const remoteVideo = document.getElementById('remoteVideo');
             console.log("Remote tracks:", event.streams[0].getTracks());
 
@@ -149,12 +165,22 @@ function ensurePeerConnection() {
 
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
-                console.log("ICE Candidate:", event.candidate); // 👈 Add this
+                console.log("ICE Candidate:", event.candidate); 
                 sendMessage({ type: 'ice-candidate', candidate: event.candidate });
             } else {
                 console.log("All ICE candidates sent.");
             }
         };
+
+        peerConnection.oniceconnectionstatechange = () => {
+            console.log("ICE connection State: ", peerConnection.iceConnectionState);
+        };
+
+        peerConnection.onicegatheringstatechange = () => {
+            console.log("ICE gathering State:", peerConnection.iceGatheringState);
+        };   
+        
+
     }
 }
 
@@ -183,7 +209,7 @@ async function handleMessage(message){
 
 function sendMessage(message){
     message.sender = peerid; //Add the sender id to the message
-    socket.emit('message',{room:room, data : message});
+    socket.emit('message',{room:room, data : message, token: localStorage.getItem("token")});
 }
 
 // sendMessage({type:'hello', content: 'World!'});
@@ -252,6 +278,7 @@ function cleanUp(){
         socket = null;
     }
 
+
     //reset the UI
     document.getElementById('videoSection').style.display = "none";
     document.getElementById('joinForm').style.display = "block";
@@ -267,7 +294,13 @@ function sendChat() {
 
     console.log("Sending chat message:", msg);
 
-    socket.emit('chat', { room: room, message: msg, sender: username });
+    socket.emit('chat', { 
+        room: room, 
+        message: msg, 
+        sender: username, 
+        token: localStorage.getItem("token")
+    });
+    
     addMessage(`You: ${msg}`);
     document.getElementById('chatInput').value = '';
 }
@@ -283,7 +316,7 @@ function addMessage(text) {
 
 
 
-const AUTH_API = "http://localhost:5002"; // auth-service
+const AUTH_API = "http://auth:5002"; // auth-service
 
 function register() {
     const u = document.getElementById("usernameInput").value;
@@ -352,6 +385,8 @@ function fetchMe() {
         return res.json();
     })
     .then(data => {
+        document.getElementById("roomUsername").innerText = data.username;
+        localStorage.setItem("username", data.username);
         console.log("Logged in as:", data.username);
         // you can update UI here
     })
@@ -363,7 +398,9 @@ function fetchMe() {
 
 function logout() {
     localStorage.removeItem("token");
+    localStorage.removeItem("username");
     location.reload(); // refresh page to go back to login
+    document.getElementById("mainApp").style.display = "none";
+    document.getElementById("authSection").style.display = "block";
 }
-
 

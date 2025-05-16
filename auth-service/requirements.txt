@@ -8,7 +8,7 @@ python-dotenv
 flask_bcrypt
 wtforms
 flask-wtf
-pyjwt
+pyjwt==2.6.0
 werkzeug
 flask-cors
-flask_jwt_extended
+flask_jwt_extended==4.4.4

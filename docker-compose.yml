@@ -11,22 +11,41 @@ services:
     build: ./signalling-services
     ports:
       - "5001:5001"
+    depends_on:
+      - signaling-db
+    environment:
+      - DATABASE_URL=postgresql://postgres:Zompire%4017@signaling-db:5432/signalingdb
 
   auth:
     build: ./auth-service
     ports:
       - "5002:5002"
     depends_on:
-      - db
+      - auth-db
     environment:
-      - DATABASE_URL=postgresql://postgres:Zompire%4017@db:5432/authdb
+      - DATABASE_URL=postgresql://postgres:Zompire%4017@auth-db:5432/authdb
    
 
-  db:
-    image: postgres:13
+  auth-db:
+    image: postgres:14
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: Zompire@17
       POSTGRES_DB: authdb
     ports:
       - "5432:5432"
+
+  signaling-db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Zompire@17
+      POSTGRES_DB: signalingdb
+    ports:
+      - "5433:5432"
+  
+networks:
+  default:
+    name: videochat-network
+    driver: bridge
+
