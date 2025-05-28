@@ -1,14 +1,17 @@
-# Environment files
-.env
-.env.*
-env/
-venv/
+.env*
+.env            # Base .env file
+.env.local      # Local overrides
+.env.development
+.env.production
+.env.test
 
 # Python cache and virtual environment
 __pycache__/
 *.py[cod]
 *$py.class
 .python-version
+venv/
+env/
 
 # Other common exclusions
 *.swp

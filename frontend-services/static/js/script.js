@@ -7,6 +7,11 @@ let iscaller = false; //Flag to check if the user is the caller
 let localStream;
 let peerConnection;
 let pendingMessages = []; //Array to store pending messages
+let speechSocket;
+let isTranscribing = false; // Flag to check
+let lastSend = 0;
+let subtitleTimeout;
+
 
 const config = {
     iceServers: [
@@ -27,8 +32,21 @@ window.onload  = () => {
         document.getElementById("mainApp").style.display = "none";
 }
 };
-//Moving everything to the joinRoom function
 
+
+
+function stopTranscription(callId) {
+    if (speechSocket) {
+        speechSocket.emit('end_transcription', { call_id: callId });
+        isTranscribing = false;
+        speechSocket.disconnect();
+    }
+}
+
+
+
+
+//Moving everything to the joinRoom function
 function joinRoom() {
     room = document.getElementById('roomInput').value.trim(); //trim the input to remove any extra spaces
     if(!room) return alert("Please enter a room name");
@@ -47,6 +65,7 @@ function joinRoom() {
     // const SIGNALING_URL = isDocker ? 'http://signaling:5001' : 'http://localhost:5001';
     // socket = io(SIGNALING_URL);
 
+    // Start transcription with the room name
     
     //Connect to the socket server
 
@@ -55,7 +74,7 @@ function joinRoom() {
             console.log("Other peer has left the call.");
             alert("The other person has left the call.");
             cleanUp();
-        });
+        }); 
     }
     
 
@@ -115,6 +134,77 @@ function joinRoom() {
         document.getElementById('localVideo').srcObject = stream;
         mediaready = true; //Set the media ready flag to true
         console.log('Media devices ready');
+
+        async function startTranscription(callId) {
+            // const isDocker = window.location.hostname !== 'localhost';
+            // const SPEECH_URL = isDocker ? 'http://speech:5003' : 'http://localhost:5003';
+            const SPEECH_URL = 'http://localhost:5003'
+
+            speechSocket = io(SPEECH_URL);
+            // speechSocket = io("http://speech:5003");
+
+        
+            speechSocket.on('connect', async () => {
+                speechSocket.emit('start_transcription', { call_id: callId });
+                isTranscribing = true;
+        
+                const audioContext = new AudioContext();
+                await audioContext.audioWorklet.addModule('/static/js/processor.js');
+
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+        
+                const processor = new AudioWorkletNode(audioContext, 'audio-processor');
+        
+                processor.port.onmessage = (event) => {
+                    const audioData = event.data;
+                    if (isTranscribing && Date.now() - lastSend > 250) {
+                        if (audioData && audioData.length > 0) {
+                            speechSocket.emit('audio_chunk', {
+                                audio: Array.from(audioData),  
+                                call_id: callId
+                            });
+                            lastSend = Date.now();
+                        }
+                    }
+                    // if (!isTranscribing) return;
+                    // const now = Date.now();
+                    //     // console.log("Audio data received:", audioData);
+                    // if (now - lastSend > 250) {
+                    //     console.log("Emitting audio chunk...")
+                    //     speechSocket.emit('audio_chunk', {
+                    //         audio: Array.from(audioData),
+                    //         call_id: callId
+                    //     });
+                    //     lastSend = Date.now();
+                    // }
+                };
+        
+                const source = audioContext.createMediaStreamSource(localStream);
+                source.connect(processor);
+                processor.connect(audioContext.destination);
+            });
+        
+            speechSocket.on('connect_error', (err) => {
+                console.error("Speech service connection failed:", err);
+                isTranscribing = false;
+            });
+        
+            speechSocket.on('transcription_update', (data) => {
+                console.log("Transcription update received:", data); 
+                if (data && data.text) {
+                    displaySubtitle(data.text);
+                }
+            });
+        
+            speechSocket.on('transcription_complete', (data) => {
+                addMessage(`Call Summary: ${data.summary}`);
+            });
+        }
+        
+        
+        
         
         //handle any pending messages
         pendingMessages.forEach(msg => { handleMessage(msg); });
@@ -127,6 +217,8 @@ function joinRoom() {
                 startCall();
             }, 1000);
         }
+        startTranscription(room); 
+ 
     })
     .catch(err => {
         console.error("Error accessing media devices: ", err);
@@ -220,6 +312,11 @@ async function startCall() {
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
     sendMessage({ type: 'offer', offer: offer });
+
+    socket.emit('start_call', {
+        token: localStorage.getItem("token"),
+        room: room
+    });
 }
 function toggleMute(){
     if(!localStream) return;
@@ -244,11 +341,17 @@ function toggleVideo(){
 function hangUp(){
     console.log("hanging up...");
 
+    socket.emit('end_call', {
+        token: localStorage.getItem("token"),
+        room: room
+    });
+
     if (socket && socket.connected) {
         socket.emit('leave', room);
         socket.disconnect();
         socket = null;
     }
+    stopTranscription(room);
     cleanUp();
 }
 
@@ -285,7 +388,7 @@ function cleanUp(){
     document.getElementById('roomInput').value = "";
 
     console.log("Call ended and resources cleaned up.");
-
+    document.getElementById('messages').innerHTML = '';
 }
 
 function sendChat() {
@@ -310,11 +413,22 @@ function addMessage(text) {
     const msgElem = document.createElement('div');
     msgElem.textContent = text;
     messagesDiv.appendChild(msgElem);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll
 }
 
+function displaySubtitle(text) {
+    const subtitleDiv = document.getElementById('subtitleDisplay');
+    if (!subtitleDiv) {
+        console.warn("Subtitle display element not found");
+        return;
+    }
+    subtitleDiv.innerText = text;
 
-
+    clearTimeout(subtitleTimeout);
+    subtitleTimeout = setTimeout(() => {
+        subtitleDiv.innerText = '';
+    }, 3000);
+}
 
 const AUTH_API = "http://auth:5002"; // auth-service
 

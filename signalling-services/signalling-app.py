@@ -13,25 +13,28 @@ import sys
 
 time.sleep(15)
 
-load_dotenv()
+env_path = '../frontend-services/.env'
+env_path = os.path.join(os.path.dirname(__file__), '..', 'frontend-services', '.env')
+
+load_dotenv(env_path)
 
 app = Flask(__name__, static_folder='templates/static')
-app.config['SECRET_KEY'] = "your-strong-secret-key-string"
+app.config['SECRET_KEY'] = "SECRET_KEY"
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 DB_USER = 'postgres'
-DB_PASSWORD = 'Zompire@17'  # The actual password
-encoded_password = quote(DB_PASSWORD)
+DB_PASSWORD = os.getenv('DB_PASSWORD')  # The actual password
+encoded_password = quote(str(DB_PASSWORD))
 
-DB_HOST = 'signaling-db'       # Use localhost for local testing
-DB_PORT = '5432'            # Default PostgreSQL port
-DB_NAME = 'signalingdb' # The actual password
+DB_HOST = 'signaling-db'       
+DB_PORT = '5432'           
+DB_NAME = 'signalingdb' 
 
 db_uri = f"postgresql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'jwt_secret_key'    
+app.config['JWT_SECRET_KEY'] = os.getenv('SECRET_KEY')          
 
 db = SQLAlchemy(app)
 CORS(app)
@@ -65,7 +68,7 @@ def check_database_exists():
         if not exists:
             print(f"Database '{DB_NAME}' does not exist. Creating it now...")
 
-            cursor.execute("CREATE DATABASE %s", (DB_NAME,))
+            cursor.execute("CREATE DATABASE %s", (DB_NAME))
             print(f"Database '{DB_NAME}' created successfully!")
         else:
             print(f"Database '{DB_NAME}' already exists.")
@@ -255,6 +258,34 @@ def handle_chat(data):
     print(f"[{room}] {sender}: {message}")
     emit('chat', data, room=room)
 
+
+@socketio.on('start_call')
+def handle_start_call(data):
+    """Notify all clients in the room that a call has started"""
+    token = data.get('token')
+    room = data.get('room')
+    
+    if not token or not validate_token(token):
+        emit('unauthorized', {'error': 'Invalid or missing token'})
+        return
+    
+    print(f"Call started in room: {room}")
+    emit('call_started', {'call_id': room}, room=room)
+
+@socketio.on('end_call')
+def handle_end_call(data):
+    """Notify all clients in the room that a call has ended"""
+    token = data.get('token')
+    room = data.get('room')
+    
+    if not token or not validate_token(token):
+        emit('unauthorized', {'error': 'Invalid or missing token'})
+        return
+    
+    print(f"Call ended in room: {room}")
+    emit('call_ended', {'call_id': room}, room=room)
+
+
 @app.route('/check-db', methods=['GET'])
 def check_db():
     """Route to check database status"""
@@ -280,6 +311,10 @@ def check_db():
 
     
 if __name__ ==  '__main__':
+
+    print(f"DB_PASSWORD from env: {DB_PASSWORD}")
+    print(f"Encoded password: {encoded_password}")
+    print(f"Final connection string: {db_uri}")
     print(f"Starting signaling service with database URI: {db_uri}")
 
     print(f"Final connection string: {db_uri}")

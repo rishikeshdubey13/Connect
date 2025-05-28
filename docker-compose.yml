@@ -6,6 +6,8 @@ services:
     depends_on:
       - signaling
       - auth
+    networks:
+      - videochat-network
 
   signaling:
     build: ./signalling-services
@@ -13,8 +15,12 @@ services:
       - "5001:5001"
     depends_on:
       - signaling-db
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:Zompire%4017@signaling-db:5432/signalingdb
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@signaling-db:5432/signalingdb
+    networks:
+      - videochat-network
 
   auth:
     build: ./auth-service
@@ -22,30 +28,66 @@ services:
       - "5002:5002"
     depends_on:
       - auth-db
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:Zompire%4017@auth-db:5432/authdb
-   
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@auth-db:5432/authdb
+    networks:
+      - videochat-network
+  
+  speech:
+    build: ./speech-service
+    ports:
+      - "5003:5003"
+    depends_on:
+      - speech-db
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:${DB_PASSWORD}@speech-db:5432/speechdb
+      - ASSEMBLYAI_API_KEY= ${AssemblyAI_API_KEY}
+      - OPENAI_API_KEY= ${OPENAI_API_KEY}
+    volumes:
+      - ./speech-service/model:/speech-service/model  
+    networks:
+      - videochat-network
 
   auth-db:
     image: postgres:14
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Zompire@17
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: authdb
     ports:
-      - "5432:5432"
+      - "5435:5432"
+    networks:
+      - videochat-network
 
   signaling-db:
     image: postgres:14
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Zompire@17
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: signalingdb
     ports:
       - "5433:5432"
+    networks:
+      - videochat-network
+
+  speech-db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: speechdb
+    ports:
+      - "5434:5432"
+    networks:
+      - videochat-network
   
 networks:
-  default:
-    name: videochat-network
+  videochat-network:
     driver: bridge
+
+
 

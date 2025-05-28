@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
+from dotenv import load_dotenv
 import psycopg2
 import time
 import os
@@ -12,13 +13,18 @@ from urllib.parse import quote
 
 time.sleep(15)  # Wait for the database to be ready
 
+
+env_path = '../frontend-services/.env'
+env_path = os.path.join(os.path.dirname(__file__), '..', 'frontend-services', '.env')
+load_dotenv(env_path)
+
 app = Flask(__name__)
 CORS(app)
 
 # LOCAL DATABASE CONFIGURATION
 # Change these values to match your local PostgreSQL setup
 DB_USER = 'postgres'
-DB_PASSWORD = 'Zompire@17'  # The actual password
+DB_PASSWORD = os.getenv('DB_PASSWORD')  # The actual password
 encoded_password = quote(DB_PASSWORD)
 
 DB_HOST = 'auth-db'       # Use localhost for local testing
@@ -30,7 +36,7 @@ db_uri = f"postgresql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAM
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key'    
+app.config['JWT_SECRET_KEY'] = os.getenv('SECRET_KEY') 
 
 
 jwt = JWTManager(app)
@@ -217,7 +223,7 @@ if __name__ == '__main__':
     print(f"Starting auth service with database URI: {db_uri}")
 
     print(f"Final connection string: {db_uri}")
-    print(f"Password being used: {DB_PASSWORD}")
+    # print(f"Password being used: {DB_PASSWORD}")
     
     # Check database setup
     if not check_database_exists():

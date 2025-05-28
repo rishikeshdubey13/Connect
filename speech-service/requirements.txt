@@ -1,0 +1,11 @@
+Flask
+python-dotenv
+assemblyai
+flask-socketio
+flask-cors
+psycopg2-binary
+flask-sqlalchemy 
+openai
+vosk
+ffmpeg
+numpy
