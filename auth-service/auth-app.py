@@ -21,17 +21,16 @@ load_dotenv(env_path)
 app = Flask(__name__)
 CORS(app)
 
-# LOCAL DATABASE CONFIGURATION
-# Change these values to match your local PostgreSQL setup
+
 DB_USER = 'postgres'
-DB_PASSWORD = os.getenv('DB_PASSWORD')  # The actual password
+DB_PASSWORD = os.getenv('DB_PASSWORD')  
 encoded_password = quote(DB_PASSWORD)
 
-DB_HOST = 'auth-db'       # Use localhost for local testing
-DB_PORT = '5432'            # Default PostgreSQL port
+DB_HOST = 'auth-db'       
+DB_PORT = '5432'            
 DB_NAME = 'authdb'
 
-# Construct database URI for SQLAlchemy
+
 db_uri = f"postgresql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
@@ -56,7 +55,7 @@ class User(db.Model):
 def check_database_exists():
     """Check if the database exists, create it if it doesn't"""
     try:
-        # Connect to PostgreSQL server without specifying a database
+  
         conn = psycopg2.connect(
             user=DB_USER,
             password=DB_PASSWORD,
@@ -66,7 +65,7 @@ def check_database_exists():
         conn.autocommit = True
         cursor = conn.cursor()
         
-        # Check if database exists
+     
         cursor.execute(f"SELECT 1 FROM pg_database WHERE datname = '{DB_NAME}'")
         exists = cursor.fetchone()
         
@@ -88,7 +87,7 @@ def check_database_exists():
 def test_database_connection():
     """Test connection to the specific database"""
     try:
-        # Connect to the specific database
+       
         conn = psycopg2.connect(
             user=DB_USER,
             password=DB_PASSWORD,
@@ -114,11 +113,11 @@ def setup_database():
             existing_tables = inspector.get_table_names()
             print(f"Existing tables before creation: {existing_tables}")
             
-            # Create tables
+        
             db.create_all()
             print("Tables created successfully!")
             
-            # List tables after creation
+            
             inspector = db.inspect(db.engine)
             new_tables = inspector.get_table_names()
             print(f"Tables after creation: {new_tables}")
@@ -127,13 +126,6 @@ def setup_database():
         except Exception as e:
             print(f"Error creating database tables: {e}")
             return False
-
-# with app.app_context():
-#     print("Creating database tables...")
-#     try:
-#         db.create_all()
-#     except Exception as e:
-#         print(f"Error creating database tables: {e}")
 
 
 @app.route('/me', methods = ['GET'])
@@ -210,10 +202,7 @@ def check_db():
         'user_count': user_count,
         'sqlalchemy_uri': app.config['SQLALCHEMY_DATABASE_URI']
     })
-# @app.errorhandler(500)
-# def internal_server_error(e):
-
-#     return jsonify({'error': 'Server error', 'detail': str(e)}), 500
+# 
 
 
 
@@ -223,9 +212,7 @@ if __name__ == '__main__':
     print(f"Starting auth service with database URI: {db_uri}")
 
     print(f"Final connection string: {db_uri}")
-    # print(f"Password being used: {DB_PASSWORD}")
-    
-    # Check database setup
+   
     if not check_database_exists():
         print("Failed to ensure database exists. Exiting.")
         sys.exit(1)

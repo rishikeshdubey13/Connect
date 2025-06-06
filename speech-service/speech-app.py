@@ -2,7 +2,9 @@ from flask import Flask, request, jsonify
 from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from vosk import Model, KaldiRecognizer
-import assemblyai as aai
+from flask_cors import CORS
+from flask_cors import CORS
+# import assemblyai as aai
 import openai
 import os
 from datetime import datetime
@@ -23,6 +25,10 @@ env_path = os.path.join(os.path.dirname(__file__), '..', 'frontend-services', '.
 load_dotenv(env_path)
 
 app = Flask(__name__)
+CORS(app, resources={
+    r"/socket.io/*": {"origins": "*"},
+    r"/*": {"origins": "*"}
+})
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
 DB_USER = 'postgres'
@@ -42,7 +48,7 @@ app.config['JWT_SECRET_KEY'] = os.getenv('SECRET_KEY')
 db = SQLAlchemy(app)
 
 
-aai.settings.api_key = os.getenv('AssemblyAI_API_KEY')
+# aai.settings.api_key = os.getenv('AssemblyAI_API_KEY')
 openai.api_key  = os.getenv('OPENAI_API_KEY')
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -54,10 +60,28 @@ class CallTranscript(db.Model):
     summary =  db.Column(db.Text, nullable = False)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
 
-model_path = os.path.join(os.path.dirname(__file__), 'model')
-model = Model(model_path)
+
+
+
+
+
+
+def load_vosk_model():
+    model_path = os.path.join(os.path.dirname(__file__), 'model')
+    if not os.path.exists(model_path):
+        print(f"Vosk model not found at {model_path}.")
+        sys.exit(1)
+    try:
+        print("Loading Vosk Model..")
+        model = Model(model_path)
+        print("Vosk Model loaded successfully.")
+        return model
+    except Exception as e:
+        print(f"Error loading Vosk model: {e}")
+        sys.exit(1)
+        
  
-# audio_file = "https://assembly.ai/wildfires.mp3"
+
 def check_database_exists():
     """Check if the database exists, create it if it doesn't"""
     try:
@@ -147,29 +171,7 @@ def handle_start_transcription(data):
     recognizers[call_id] = KaldiRecognizer(model, 16000)
     recognizers[call_id].SetWords(True)
             
-    # def on_data(chunk):
-    #     print("[BACKEND] on_data() trigered")
-    #     if chunk.text:
-    #         print(f"[BACKEND] Sending chunk: {chunk.text}")  
-    #         transcriber.transcript_chunks.append(chunk.text)
-    #         socketio.emit('transcription_update', {
-    #             'call_id': call_id,
-    #             'text': chunk.text
-    #         }, room=call_id)
-            
-    # def on_error(error):
-    #     print(f"Transcription error: {error}")
-    #     socketio.emit('transcription_error', {
-    #         'call_id': call_id,
-    #         'error': str(error)
-    #     }, room=call_id)
-            
-    # transcriber = aai.RealtimeTranscriber(on_data=on_data,on_error=on_error, 
-    #                                       sample_rate=16000)
-    # transcriber.transcript_chunks = []
-    # transcriber.connect()
-    # transcribers[call_id] = transcriber
-    # print(f"Transcription started for call: {call_id}")
+ 
 
 
 @socketio.on('audio_chunk')
@@ -178,27 +180,38 @@ def handle_audio_chunk(data):
     raw_audio = data.get('audio')
     
     if not call_id or not raw_audio:
-        print("⚠️ Invalid or missing audio data")
+        print(" Invalid or missing audio data")
         return
     try:
-   
-        if isinstance(raw_audio, list):
-            audio_array = np.array(raw_audio, dtype=np.float32)
-            
-            if np.max(np.abs(audio_array)) > 1.0:
-                audio_array = audio_array / np.max(np.abs(audio_array))
-            audio_data = (audio_array * 32767).astype(np.int16).tobytes()
-        else:
+        if not isinstance(raw_audio, list):
+            print("Invalid audio data format. Expect list for audio data.")
+            return 
+        if len(raw_audio) < 1600: #100ms of audio at 16khz
+            print(f"Audio chunk to short: {len(raw_audio)} samples")
             return
-    except Exception as e:
-        print(f"Failed to convert audio: {e}")
-        return
+        
+        #to proper format for vosk
+        audio_array = np.array(raw_audio, dtype=np.float32)
 
+        if np.max(np.abs(audio_array)) > 1.0:
+            audio_array = audio_array / np.max(np.abs(audio_array))
+        audio_data = (audio_array * 32767).astype(np.int16).tobytes()
 
-    if call_id in recognizers:
-        recognizer = recognizers[call_id]
-        try:
+    #     if isinstance(raw_audio, list):
+    #         audio_array = np.array(raw_audio, dtype=np.float32)
+            
+    #         if np.max(np.abs(audio_array)) > 1.0:
+    #             audio_array = audio_array / np.max(np.abs(audio_array))
+    #         audio_data = (audio_array * 32767).astype(np.int16).tobytes()
+    #     else:
+    #         return
+    # except Exception as e:
+    #     print(f"Failed to convert audio: {e}")
+    #     return
 
+        #Process with vosk
+        if call_id in recognizers:
+            recognizer = recognizers[call_id]
             if recognizer.AcceptWaveform(audio_data):
                 result = json.loads(recognizer.Result())
                 text = result.get('text')
@@ -210,8 +223,12 @@ def handle_audio_chunk(data):
                 if partial:
                     print(f"✏️ Partial: {partial}")
                     socketio.emit('transcription_update', {'call_id': call_id, 'text': partial}, room=call_id)
-        except Exception as e:
-            print(f"Vosk crashed while decoding: {e}")
+    except Exception as e:
+        print(f"Vosk crashed while decoding: {e}")
+        socketio.emit('transcription_error', {
+            'call_id': call_id,
+            'error': str(e)
+        }, room=call_id)
 
 
 
@@ -262,15 +279,6 @@ def generate_summary(text):
         return "Summary unavailable due to error."
 
 
-# config = aai.TranscriptionConfig(speech_model=aai.SpeechModel.best)
-
-# transcript = aai.Transcriber(config=config).transcribe(audio_file)
-
-# if transcript.status == "error":
-#   raise RuntimeError(f"Transcription failed: {transcript.error}")
-
-# print(transcript.text)
-
 @app.route('/check-db', methods=['GET'])
 def check_db():
     """Route to check database status"""
@@ -296,6 +304,9 @@ def check_db():
 
 
 if __name__ == '__main__':  
+
+    model = load_vosk_model()
+
     if not check_database_exists():
         print("Failed to ensure database exists. Exiting.")
         sys.exit(1)

@@ -28,12 +28,23 @@ window.onload  = () => {
     const token = localStorage.getItem("token");
     if (token) {
         fetchMe();
-        document.getElementById("authSection").style.display = "block";
-        document.getElementById("mainApp").style.display = "none";
+        document.getElementById("authSection").style.display = "none";
+        document.getElementById("mainApp").style.display = "block";
 }
 };
 
+function getSrviceUrl(service){
+    const isDocker = window.location.hostname !== 'localhost' && window.location.hostname !=='127.0.0.1';
 
+    const ports = {
+        'signaling': 5001,
+        'speech': 5003,
+        'auth': 5002
+    }
+
+    return isDocker ? `http://${service}:${ports[service]}` : `http://localhost:${ports[service]}`;
+
+}
 
 function stopTranscription(callId) {
     if (speechSocket) {
@@ -56,8 +67,10 @@ function joinRoom() {
     document.getElementById('roomName').innerText = room; //Set the room name in the video section
 
 
-    const isDocker = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-    const SIGNALING_URL = isDocker ? 'http://signaling:5001' : 'http://localhost:5001';
+    // const isDocker = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+    // const SIGNALING_URL = isDocker ? 'http://signaling:5001' : 'http://localhost:5001';
+
+    const SIGNALING_URL = getSrviceUrl('signaling'); 
     socket = io(SIGNALING_URL);
 
     // socket = io("http://signaling:5001");  // Use service name in Docker
@@ -136,9 +149,9 @@ function joinRoom() {
         console.log('Media devices ready');
 
         async function startTranscription(callId) {
-            // const isDocker = window.location.hostname !== 'localhost';
-            // const SPEECH_URL = isDocker ? 'http://speech:5003' : 'http://localhost:5003';
-            const SPEECH_URL = 'http://localhost:5003'
+            const isDocker = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+            const SPEECH_URL = isDocker ? 'http://speech:5003' : 'http://localhost:5003';
+            // const SPEECH_URL = 'http://localhost:5003'
 
             speechSocket = io(SPEECH_URL);
             // speechSocket = io("http://speech:5003");
@@ -430,7 +443,9 @@ function displaySubtitle(text) {
     }, 3000);
 }
 
-const AUTH_API = "http://auth:5002"; // auth-service
+// const AUTH_API = "http://auth:5002"; // auth-service
+const AUTH_API = getSrviceUrl('auth');
+
 
 function register() {
     const u = document.getElementById("usernameInput").value;
@@ -439,7 +454,9 @@ function register() {
         alert("Please enter both username and password.");
         return;
     }
-    fetch("http://localhost:5002/register", {
+    
+    // fetch("http://localhost:5002/register", {
+    fetch(`${getSrviceUrl('auth')}/register`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
