@@ -209,9 +209,6 @@ def check_db():
 
 
 if __name__ == '__main__':
-    print(f"Starting auth service with database URI: {db_uri}")
-
-    print(f"Final connection string: {db_uri}")
    
     if not check_database_exists():
         print("Failed to ensure database exists. Exiting.")

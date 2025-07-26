@@ -1,18 +1,26 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Video Chat</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Chat Application</title>
     <style>
-        video {
-            width: 45%;
-            height: auto;
-            border: 2px solid black;
-            margin: 10px;
+        #authSection, #mainApp { margin: 20px; }
+        #videoSection { display: none; }
+        video { width: 300px; height: 200px; border: 1px solid black; }
+        #messages { height: 200px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; }
+        #targetLanguage { margin-left: 10px; padding: 5px;}
+        .subtitle-original {
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px;
+            margin: 5px;
         }
-        body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+        .subtitle-translated {
+            color: yellow;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px;
+            margin: 5px;
         }
         .video-container {
             display: flex;
@@ -20,56 +28,53 @@
         }
     </style>
 </head>
+
 <body>
     <div id="authSection">
-        <h2>Login or Register</h2>
-        <input type="text" id="usernameInput" placeholder="Username" />
-        <input type="password" id="passwordInput" placeholder="Password" />
-        <br />
+        <h1>Login or Register</h1>
+        <input id="usernameInput" type="text" placeholder="Username">
+        <input id="passwordInput" type="password" placeholder="Password">
+        <p id="authMsg"></p>
         <button onclick="register()">Register</button>
         <button onclick="login()">Login</button>
-        ~<button onclick="logout()">Logout</button>
-        <p id="authMsg"></p>
+        <button onclick="logout()">Logout</button>
     </div>
-
     
     <div id = "mainApp" style ="display: none;">
         <h1>Video Chat Application</h1>
         <h2>Welcome, <span id ="roomUsername"></span></h2>
 
-        <div id = 'joinForm'>
-            <input type = 'text' id="roomInput" placeholder="Enter room name">
-            <button onclick="joinRoom()">Join Room</button>
+        <div>
+            <form id="joinForm">
+                <input id="roomInput" type="text" placeholder="Enter room name">
+                <button type="submit" onclick="joinRoom()">Join Room</button>
+            </form>
         </div>
 
-        <div id = "videoSection" style="display: none;">
-            <h3>Room: <span id="roomName"></span></h3>
-            <div>
-                <button id ="muteBtn" onclick = "toggleMute()">Mute</button>
-                <button id = "videoBtn" onclick = "toggleVideo()">Turn camera off</button>
-                <button id = "hangUpBtn" onclick = "hangUp()">Hang up</button>
+        <div id="videoSection">
+            <h2>Room: <span id="roomName"></span></h2>
+            <div id="videoControls">
+                <select id="targetLanguage">
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="it">Italian</option>
+                    <option value="zh">Chinese</option>
+                </select>
+                <button id="muteBtn" onclick="toggleMute()">Mute</button>
+                <button id="videoBtn" onclick="toggleVideo()">Turn camera off</button>
+                <button onclick="hangUp()">Hang up</button>
             </div>
             <div class="video-container">
-                <video id="localVideo" autoplay muted playsinline></video>
-                <video id="remoteVideo" autoplay playsinline></video>
-                <div id="subtitleDisplay" style="
-                    position: absolute;
-                    bottom: 10%;
-                    width: 100%;
-                    text-align: center;
-                    font-size: 1.5rem;
-                    color: white;
-                    text-shadow: 0 0 10px black;
-                    z-index: 10;
-                    pointer-events: none;
-                "></div>
+                <video id="localVideo" autoplay muted></video>
+                <video id="remoteVideo" autoplay></video>
+                <div id="subtitleDisplay"></div>
             </div>
         </div>
-
-        <div id="chatBox">
-            <h3>Chat</h3>
-            <div id="messages" style="height: 200px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px;"></div>
-            <input id="chatInput" type="text" placeholder="Type a message..." />
+        <div>
+            <h2>Chat</h2>
+            <div id="messages"></div>
+            <input id="chatInput" type="text" placeholder="Type a message">
             <button onclick="sendChat()">Send</button>
         </div>
     </div>
@@ -80,3 +85,7 @@
    
 </body>
 </html>
+  
+
+
+

@@ -1,10 +1,9 @@
+import socketio as sio  # Import python-socketio client
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from vosk import Model, KaldiRecognizer
 from flask_cors import CORS
-from flask_cors import CORS
-# import assemblyai as aai
 import openai
 import os
 from datetime import datetime
@@ -13,13 +12,14 @@ import sys
 import time
 import json
 import numpy as np
-
 from dotenv import load_dotenv
 from urllib.parse import quote
 
+
+
 time.sleep(15)
 
-env_path = '../frontend-services/.env'
+# env_path = '../frontend-services/.env'
 env_path = os.path.join(os.path.dirname(__file__), '..', 'frontend-services', '.env')
 
 load_dotenv(env_path)
@@ -29,6 +29,7 @@ CORS(app, resources={
     r"/socket.io/*": {"origins": "*"},
     r"/*": {"origins": "*"}
 })
+
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
 DB_USER = 'postgres'
@@ -52,6 +53,17 @@ db = SQLAlchemy(app)
 openai.api_key  = os.getenv('OPENAI_API_KEY')
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+translation_client = sio.Client()
+
+def connect_to_translation_service():
+    try:
+        translation_client.connect('http://translation:5004')
+        print("Connected to translation service")
+    except Exception as e:
+        print(f"Failed to connect to translation service: {e}")
+        # Optionally, implement retry logic
+        time.sleep(5)
+        connect_to_translation_service()
 
 class CallTranscript(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -59,11 +71,6 @@ class CallTranscript(db.Model):
     transcript = db.Column(db.Text, nullable = False)
     summary =  db.Column(db.Text, nullable = False)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
-
-
-
-
-
 
 
 def load_vosk_model():
@@ -81,7 +88,6 @@ def load_vosk_model():
         sys.exit(1)
         
  
-
 def check_database_exists():
     """Check if the database exists, create it if it doesn't"""
     try:
@@ -156,8 +162,6 @@ def setup_database():
             print(f"Error creating database tables: {e}")
             return False
 
-
-# transcribers = {}
 recognizers = {}
 
 @app.route('/')
@@ -172,12 +176,11 @@ def handle_start_transcription(data):
     recognizers[call_id].SetWords(True)
             
  
-
-
 @socketio.on('audio_chunk')
 def handle_audio_chunk(data):
     call_id = data.get('call_id')
     raw_audio = data.get('audio')
+    target_lang = data.get('target_lang', 'es')
     
     if not call_id or not raw_audio:
         print(" Invalid or missing audio data")
@@ -197,18 +200,6 @@ def handle_audio_chunk(data):
             audio_array = audio_array / np.max(np.abs(audio_array))
         audio_data = (audio_array * 32767).astype(np.int16).tobytes()
 
-    #     if isinstance(raw_audio, list):
-    #         audio_array = np.array(raw_audio, dtype=np.float32)
-            
-    #         if np.max(np.abs(audio_array)) > 1.0:
-    #             audio_array = audio_array / np.max(np.abs(audio_array))
-    #         audio_data = (audio_array * 32767).astype(np.int16).tobytes()
-    #     else:
-    #         return
-    # except Exception as e:
-    #     print(f"Failed to convert audio: {e}")
-    #     return
-
         #Process with vosk
         if call_id in recognizers:
             recognizer = recognizers[call_id]
@@ -218,11 +209,28 @@ def handle_audio_chunk(data):
                 if text:
                     print(f"🗣️ Final: {text}")
                     socketio.emit('transcription_update', {'call_id': call_id, 'text': text}, room=call_id)
+                    # Send to translation service
+                    translation_client.emit('translate', {
+                        'text': text,
+                        'target_lang': data.get('target_lang', 'es') # change to desired target language 
+                        },callback = lambda response: socketio.emit('tranlation_update',{
+                            'call_id': call_id,
+                            'translated_text': response['translated'],
+                            'lang': response['lang']}
+                            , room=call_id))
             else:
                 partial = json.loads(recognizer.PartialResult()).get('partial', '')
                 if partial:
                     print(f"✏️ Partial: {partial}")
                     socketio.emit('transcription_update', {'call_id': call_id, 'text': partial}, room=call_id)
+                    translation_client.emit('translate', {
+                    'text': partial,
+                    'target_lang': data.get('target_lang', 'es') # change to desired target language 
+                    },callback = lambda response: socketio.emit('tranlation_update',{
+                        'call_id': call_id,
+                        'translated_text': response['translated'],
+                        'lang': response['lang']}
+                        ,room=call_id))
     except Exception as e:
         print(f"Vosk crashed while decoding: {e}")
         socketio.emit('transcription_error', {
@@ -232,17 +240,6 @@ def handle_audio_chunk(data):
 
 
 
-
-    # if not call_id or not audio_data:
-    #     print(f'Invalid audio chunk recieved: {data}')
-    #     return
-
-
-    # if call_id in transcribers:
-    #     print(f"[BACKEND] Received audio chunk for call: {call_id}, size: len(audio_data)")
-    #     transcribers[call_id].stream(audio_data)
-
-
 @socketio.on('end_transcription')
 def handle_end_transcription(data):
     call_id = data.get('call_id')
@@ -250,18 +247,20 @@ def handle_end_transcription(data):
     if call_id in recognizers:
         final = json.loads(recognizers[call_id].FinalResult())
         final_text = final.get('text', '')
-        print(f"✅ Transcription complete: {final_text}")
+        print(f" Transcription complete: {final_text}")
         del recognizers[call_id]
 
-    record = CallTranscript(call_id=call_id, transcript=final_text, summary="")
-    db.session.add(record)
-    db.session.commit()
+        summary = generate_summary(final_text) if final_text else "No text to summarize"
 
-    socketio.emit('transcription_complete', {
-        'call_id': call_id,
-        'transcript': final_text,
-        'summary': "Summary feature disabled with Vosk"
-    }, room=call_id)
+        record = CallTranscript(call_id=call_id, transcript=final_text, summary = summary)
+        db.session.add(record)
+        db.session.commit()
+
+        socketio.emit('transcription_complete', {
+            'call_id': call_id,
+            'transcript': final_text,
+            'summary': summary
+        }, room=call_id)
 
 def generate_summary(text):
     """Generate summary using OpenAI's GPT-3.5"""
@@ -277,6 +276,8 @@ def generate_summary(text):
     except Exception as e:
         print(f"OpenAI summary generation error: {e}")
         return "Summary unavailable due to error."
+
+
 
 
 @app.route('/check-db', methods=['GET'])
@@ -321,5 +322,6 @@ if __name__ == '__main__':
     
     print("Database setup complete. Starting Flask server...")
     print("Starting Vosk Speech Service...")
+    connect_to_translation_service()
 
     socketio.run(app, host='0.0.0.0', port=5003, debug =True,allow_unsafe_werkzeug=True)

@@ -311,14 +311,6 @@ def check_db():
 
     
 if __name__ ==  '__main__':
-
-    print(f"DB_PASSWORD from env: {DB_PASSWORD}")
-    print(f"Encoded password: {encoded_password}")
-    print(f"Final connection string: {db_uri}")
-    print(f"Starting signaling service with database URI: {db_uri}")
-
-    print(f"Final connection string: {db_uri}")
-    print(f"Password being used: {DB_PASSWORD}")
     
     # Check database setup
     if not check_database_exists():

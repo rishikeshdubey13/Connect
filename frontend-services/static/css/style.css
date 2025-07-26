@@ -106,3 +106,16 @@ input {
 #subtitleDisplay.hidden {
     opacity: 0;
 }
+
+subtitle-original {
+    color: white;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 5px;
+    margin: 5px;
+}
+.subtitle-translated {
+    color: yellow;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 5px;
+    margin: 5px;
+}

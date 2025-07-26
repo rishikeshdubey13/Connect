@@ -35,6 +35,18 @@ services:
     networks:
       - videochat-network
   
+  translation:
+    build: ./translation-service
+    ports:
+      - "5004:5004"
+    env_file:
+      - .env
+    networks:
+      - videochat-network
+
+    
+
+  
   speech:
     build: ./speech-service
     ports:

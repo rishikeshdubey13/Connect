@@ -39,25 +39,33 @@ function getSrviceUrl(service){
     const ports = {
         'signaling': 5001,
         'speech': 5003,
-        'auth': 5002
+        'auth': 5002,
+        'translation': 5004,
     }
 
     return isDocker ? `http://${service}:${ports[service]}` : `http://localhost:${ports[service]}`;
 
 }
 
+const Translation_url = getSrviceUrl('translation');
+const translationSocket = io(Translation_url);
+
+// translationSocket.on('connect_error', (err) => {
+//     console.error("Translation service connection failed:", err);
+//     alert("Unable to connect to the translation service. Please try again later.");
+// });
+
 function stopTranscription(callId) {
     if (speechSocket) {
         speechSocket.emit('end_transcription', { call_id: callId });
         isTranscribing = false;
         speechSocket.disconnect();
+        speechSocket = null;
+        console.log("Transcription stopped for call:", callId);
+
     }
 }
 
-
-
-
-//Moving everything to the joinRoom function
 function joinRoom() {
     room = document.getElementById('roomInput').value.trim(); //trim the input to remove any extra spaces
     if(!room) return alert("Please enter a room name");
@@ -67,16 +75,11 @@ function joinRoom() {
     document.getElementById('roomName').innerText = room; //Set the room name in the video section
 
 
-    // const isDocker = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-    // const SIGNALING_URL = isDocker ? 'http://signaling:5001' : 'http://localhost:5001';
-
+    
     const SIGNALING_URL = getSrviceUrl('signaling'); 
     socket = io(SIGNALING_URL);
 
-    // socket = io("http://signaling:5001");  // Use service name in Docker
-    // const isDocker = window.location.hostname !== 'localhost';
-    // const SIGNALING_URL = isDocker ? 'http://signaling:5001' : 'http://localhost:5001';
-    // socket = io(SIGNALING_URL);
+    
 
     // Start transcription with the room name
     
@@ -149,16 +152,16 @@ function joinRoom() {
         console.log('Media devices ready');
 
         async function startTranscription(callId) {
+            
             const isDocker = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-            const SPEECH_URL = isDocker ? 'http://speech:5003' : 'http://localhost:5003';
-            // const SPEECH_URL = 'http://localhost:5003'
-
+            const SPEECH_URL = getSrviceUrl('speech'); 
             speechSocket = io(SPEECH_URL);
-            // speechSocket = io("http://speech:5003");
 
-        
+            const targetLang =  document.getElementById('targetLanguage').value || 'en'; 
+
+            
             speechSocket.on('connect', async () => {
-                speechSocket.emit('start_transcription', { call_id: callId });
+                speechSocket.emit('start_transcription', { call_id: callId, target_lang: targetLang });
                 isTranscribing = true;
         
                 const audioContext = new AudioContext();
@@ -176,22 +179,12 @@ function joinRoom() {
                         if (audioData && audioData.length > 0) {
                             speechSocket.emit('audio_chunk', {
                                 audio: Array.from(audioData),  
-                                call_id: callId
+                                call_id: callId,
+                                target_lang: targetLang 
                             });
                             lastSend = Date.now();
                         }
                     }
-                    // if (!isTranscribing) return;
-                    // const now = Date.now();
-                    //     // console.log("Audio data received:", audioData);
-                    // if (now - lastSend > 250) {
-                    //     console.log("Emitting audio chunk...")
-                    //     speechSocket.emit('audio_chunk', {
-                    //         audio: Array.from(audioData),
-                    //         call_id: callId
-                    //     });
-                    //     lastSend = Date.now();
-                    // }
                 };
         
                 const source = audioContext.createMediaStreamSource(localStream);
@@ -202,17 +195,35 @@ function joinRoom() {
             speechSocket.on('connect_error', (err) => {
                 console.error("Speech service connection failed:", err);
                 isTranscribing = false;
+                setTimeout(() => {
+                    if (speechSocket) {
+                        speechSocket.connect();
+                    }
+                }, 5000); // Retry after 5 seconds
+            });
+
+            translationSocket.on('connect_error', (err) => {
+                console.error("Translation service connection failed:", err);
+                setTimeout(() => {
+                    translationSocket.connect();
+                }, 5000); // Retry after 5 seconds
             });
         
+            //Added two new event listener for translation_update.
+            // for orginal
             speechSocket.on('transcription_update', (data) => {
-                console.log("Transcription update received:", data); 
+                console.log('Transcription update recived:', data);
                 if (data && data.text) {
-                    displaySubtitle(data.text);
+                    displaySubtitle(data.text, 'original');
                 }
             });
-        
-            speechSocket.on('transcription_complete', (data) => {
-                addMessage(`Call Summary: ${data.summary}`);
+
+            // for translated text
+            speechSocket.on('translation_update', (data) => {
+                console.log("Translation update received:", data);
+                if (data && data.translated) {
+                    displaySubtitle(data.translated, 'translated');
+                }
             });
         }
         
@@ -317,7 +328,6 @@ function sendMessage(message){
     socket.emit('message',{room:room, data : message, token: localStorage.getItem("token")});
 }
 
-// sendMessage({type:'hello', content: 'World!'});
 
 //function to start the call
 async function startCall() {
@@ -351,58 +361,63 @@ function toggleVideo(){
     document.getElementById('videoBtn').innerText = videoTracks.enabled ? "Turn Camera Off" : "Turn Camera On";
 }
 
-function hangUp(){
-    console.log("hanging up...");
+    function hangUp(){
+        console.log("hanging up...");
 
-    socket.emit('end_call', {
-        token: localStorage.getItem("token"),
-        room: room
-    });
+        socket.emit('end_call', {
+            token: localStorage.getItem("token"),
+            room: room
+        });
 
-    if (socket && socket.connected) {
-        socket.emit('leave', room);
-        socket.disconnect();
-        socket = null;
-    }
-    stopTranscription(room);
-    cleanUp();
-}
-
-function cleanUp(){
-    //stop the local stream
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-
-    //close peer connection
-    if(peerConnection){
-        peerConnection.close();
-        peerConnection = null;
+        if (socket && socket.connected) {
+            socket.emit('leave', room);
+            socket.disconnect();
+            socket = null;
+        }
+        stopTranscription(room);
+        cleanUp();
     }
 
-    //remove video streams
-    document.getElementById('localVideo').srcObject = null;
-    document.getElementById('remoteVideo').srcObject = null;
+    function cleanUp(){
+        //stop the local stream
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
 
-    //reset the flags
-    mediaready = false;
-    iscaller =false;
-    pendingMessages = [];
+        //close peer connection
+        if(peerConnection){
+            peerConnection.close();
+            peerConnection = null;
+        }
 
-    //reset the socket
-    if(socket){
-        socket.disconnect();
-        socket = null;
+        //remove video streams
+        document.getElementById('localVideo').srcObject = null;
+        document.getElementById('remoteVideo').srcObject = null;
+
+        //reset the flags
+        mediaready = false;
+        iscaller =false;
+        pendingMessages = [];
+
+        //reset the socket
+        if(socket){
+            socket.disconnect();
+            socket = null;
+        }
+
+         //reset speechSocket
+        if(speechSocket){
+            speechSocket.disconnect();
+            speechSocket = null;
     }
 
+        //reset the UI
+        document.getElementById('videoSection').style.display = "none";
+        document.getElementById('joinForm').style.display = "block";
+        document.getElementById('roomInput').value = "";
 
-    //reset the UI
-    document.getElementById('videoSection').style.display = "none";
-    document.getElementById('joinForm').style.display = "block";
-    document.getElementById('roomInput').value = "";
-
-    console.log("Call ended and resources cleaned up.");
-    document.getElementById('messages').innerHTML = '';
-}
+        console.log("Call ended and resources cleaned up.");
+        document.getElementById('messages').innerHTML = '';
+    }
 
 function sendChat() {
     const msg = document.getElementById('chatInput').value.trim();
@@ -429,22 +444,30 @@ function addMessage(text) {
     messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll
 }
 
-function displaySubtitle(text) {
+
+function displaySubtitle(text, type = 'original') {
     const subtitleDiv = document.getElementById('subtitleDisplay');
     if (!subtitleDiv) {
         console.warn("Subtitle display element not found");
         return;
     }
-    subtitleDiv.innerText = text;
+    const subtitleElement = document.createElement('div');
+    subtitleElement.className = type === 'original' ? 'subtitle-original' : 'subtitle-translated';
+    subtitleElement.innerText = text;
+    subtitleDiv.appendChild(subtitleElement);
+
 
     clearTimeout(subtitleTimeout);
     subtitleTimeout = setTimeout(() => {
         subtitleDiv.innerText = '';
-    }, 3000);
+    }, 5000);
 }
 
-// const AUTH_API = "http://auth:5002"; // auth-service
+
 const AUTH_API = getSrviceUrl('auth');
+
+
+
 
 
 function register() {
@@ -455,7 +478,7 @@ function register() {
         return;
     }
     
-    // fetch("http://localhost:5002/register", {
+    
     fetch(`${getSrviceUrl('auth')}/register`, {
         method: "POST",
         headers: {
@@ -479,7 +502,7 @@ function login() {
         alert("Please enter both username and password.");
         return;
     }
-    fetch("http://localhost:5002/login", {
+    fetch(`${getSrviceUrl('auth')}/login`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -503,7 +526,7 @@ function fetchMe() {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    fetch("http://localhost:5002/me", {
+    fetch(`${getSrviceUrl('auth')}/me`, {
         method: "GET",
         headers: {
             "Authorization": "Bearer " + token
@@ -516,10 +539,11 @@ function fetchMe() {
         return res.json();
     })
     .then(data => {
+        
+        username = data.username; // Set the global username variable
         document.getElementById("roomUsername").innerText = data.username;
         localStorage.setItem("username", data.username);
         console.log("Logged in as:", data.username);
-        // you can update UI here
     })
     .catch(err => {
         console.error(err);
@@ -530,6 +554,7 @@ function fetchMe() {
 function logout() {
     localStorage.removeItem("token");
     localStorage.removeItem("username");
+    username = "";
     location.reload(); // refresh page to go back to login
     document.getElementById("mainApp").style.display = "none";
     document.getElementById("authSection").style.display = "block";
