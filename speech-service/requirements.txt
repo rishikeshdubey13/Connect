@@ -10,3 +10,4 @@ vosk
 ffmpeg
 numpy
 python-socketio
+websocket-client

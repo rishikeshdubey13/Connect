@@ -75,6 +75,7 @@ class CallTranscript(db.Model):
 
 def load_vosk_model():
     model_path = os.path.join(os.path.dirname(__file__), 'model')
+    print(f"Checking Vosk model at: {model_path}")
     if not os.path.exists(model_path):
         print(f"Vosk model not found at {model_path}.")
         sys.exit(1)
@@ -171,9 +172,17 @@ def index():
 @socketio.on('start_transcription')
 def handle_start_transcription(data):
     call_id = data.get('call_id')
-    print(f"Starting transcation for call: {{call_id}}")
-    recognizers[call_id] = KaldiRecognizer(model, 16000)
-    recognizers[call_id].SetWords(True)
+    if not call_id:
+        print("Missing call_id in start_transcription")
+        socketio.emit('transcription_error', {'call_id': call_id, 'error': 'Missing call_id'}, room=call_id)
+        return
+    print(f"Starting transcription for call: {call_id}")
+    try:
+        recognizers[call_id] = KaldiRecognizer(model, 16000)
+        recognizers[call_id].SetWords(True)
+    except Exception as e:
+        print(f"Failed to initialize recognizer for call_id {call_id}: {e}")
+        socketio.emit('transcription_error', {'call_id': call_id, 'error': str(e)}, room=call_id)
             
  
 @socketio.on('audio_chunk')
@@ -183,21 +192,38 @@ def handle_audio_chunk(data):
     target_lang = data.get('target_lang', 'es')
     
     if not call_id or not raw_audio:
-        print(" Invalid or missing audio data")
+        print(f"Invalid or missing data: call_id={call_id}, audio_length={len(raw_audio) if raw_audio else None}")
+        socketio.emit('transcription_error', {'call_id': call_id, 'error': 'Missing call_id or audio data'}, room=call_id)
+        return
+    
+    if call_id not in recognizers:
+        print(f"Recognizer not found for call_id: {call_id}")
+        socketio.emit('transcription_error', {'call_id': call_id, 'error': 'Recognizer not initialized'}, room=call_id)
         return
     try:
         if not isinstance(raw_audio, list):
-            print("Invalid audio data format. Expect list for audio data.")
-            return 
-        if len(raw_audio) < 1600: #100ms of audio at 16khz
-            print(f"Audio chunk to short: {len(raw_audio)} samples")
+            print(f"Invalid audio data format: expected list, got {type(raw_audio)}")
+            socketio.emit('transcription_error', {'call_id': call_id, 'error': 'Invalid audio data format'}, room=call_id)
+            return
+
+        if len(raw_audio) < 1600:
+            print(f"Audio chunk too short: {len(raw_audio)} samples")
             return
         
         #to proper format for vosk
         audio_array = np.array(raw_audio, dtype=np.float32)
-
-        if np.max(np.abs(audio_array)) > 1.0:
-            audio_array = audio_array / np.max(np.abs(audio_array))
+        if np.isnan(audio_array).any() or np.isinf(audio_array).any():
+            print(f"Invalid audio data: contains NaN or Inf values")
+            socketio.emit('transcription_error', {'call_id': call_id, 'error': 'Invalid audio data (NaN/Inf)'}, room=call_id)
+            return
+        
+        # Normalize audio to prevent clipping
+        max_abs = np.max(np.abs(audio_array))
+        if max_abs > 0:  # Avoid division by zero
+            audio_array = audio_array / max_abs
+        else:
+            print(f"Silent audio chunk detected for call_id: {call_id}")
+            return  # Skip silent chunks
         audio_data = (audio_array * 32767).astype(np.int16).tobytes()
 
         #Process with vosk
@@ -232,7 +258,7 @@ def handle_audio_chunk(data):
                         'lang': response['lang']}
                         ,room=call_id))
     except Exception as e:
-        print(f"Vosk crashed while decoding: {e}")
+        print(f"Error processing audio chunk for call_id {call_id}: {e}")
         socketio.emit('transcription_error', {
             'call_id': call_id,
             'error': str(e)
@@ -243,16 +269,19 @@ def handle_audio_chunk(data):
 @socketio.on('end_transcription')
 def handle_end_transcription(data):
     call_id = data.get('call_id')
+    if not call_id or call_id not in recognizers:
+        print(f"Recognizer not found for call_id: {call_id}")
+        socketio.emit('transcription_error', {'call_id': call_id, 'error': 'Recognizer not found'}, room=call_id)
+        return
     
-    if call_id in recognizers:
+    try:
         final = json.loads(recognizers[call_id].FinalResult())
         final_text = final.get('text', '')
         print(f" Transcription complete: {final_text}")
-        del recognizers[call_id]
-
-        summary = generate_summary(final_text) if final_text else "No text to summarize"
-
-        record = CallTranscript(call_id=call_id, transcript=final_text, summary = summary)
+        
+        summary = generate_summary(final_text) if final_text else "No transcript available"
+        
+        record = CallTranscript(call_id=call_id, transcript=final_text, summary=summary)
         db.session.add(record)
         db.session.commit()
 
@@ -261,6 +290,12 @@ def handle_end_transcription(data):
             'transcript': final_text,
             'summary': summary
         }, room=call_id)
+    except Exception as e:
+        print(f"Error finalizing transcription for call_id {call_id}: {e}")
+        socketio.emit('transcription_error', {'call_id': call_id, 'error': str(e)}, room=call_id)
+    finally:
+        if call_id in recognizers:
+            del recognizers[call_id]
 
 def generate_summary(text):
     """Generate summary using OpenAI's GPT-3.5"""

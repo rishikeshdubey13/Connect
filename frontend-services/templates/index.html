@@ -6,6 +6,7 @@
     <title>Video Chat Application</title>
     <style>
         #authSection, #mainApp { margin: 20px; }
+        /* The #videoSection is hidden by default and will be displayed when a user joins a room */
         #videoSection { display: none; }
         video { width: 300px; height: 200px; border: 1px solid black; }
         #messages { height: 200px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; }
@@ -22,10 +23,10 @@
             padding: 5px;
             margin: 5px;
         }
-        .video-container {
+        /* .video-container {
             display: flex;
             justify-content: center;
-        }
+        } */
     </style>
 </head>
 
@@ -45,9 +46,9 @@
         <h2>Welcome, <span id ="roomUsername"></span></h2>
 
         <div>
-            <form id="joinForm">
+            <form id="joinForm" onsubmit="joinRoom(event); return false;">
                 <input id="roomInput" type="text" placeholder="Enter room name">
-                <button type="submit" onclick="joinRoom()">Join Room</button>
+                <button type="submit">Join Room</button>
             </form>
         </div>
 
@@ -65,7 +66,7 @@
                 <button id="videoBtn" onclick="toggleVideo()">Turn camera off</button>
                 <button onclick="hangUp()">Hang up</button>
             </div>
-            <div class="video-container">
+            <div>
                 <video id="localVideo" autoplay muted></video>
                 <video id="remoteVideo" autoplay></video>
                 <div id="subtitleDisplay"></div>
@@ -80,6 +81,7 @@
     </div>
     
 
+    <!-- <script src="../static/js/socket.io.min.js"></script> -->
     <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
     <script src ="../static/js/script.js"></script>
    

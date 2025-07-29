@@ -6,7 +6,7 @@ let mediaready = false; //Flag to check if the media is ready
 let iscaller = false; //Flag to check if the user is the caller
 let localStream;
 let peerConnection;
-let pendingMessages = []; //Array to store pending messages
+let pendingMessages = []; 
 let speechSocket;
 let isTranscribing = false; // Flag to check
 let lastSend = 0;
@@ -66,7 +66,8 @@ function stopTranscription(callId) {
     }
 }
 
-function joinRoom() {
+function joinRoom(event) {
+    event.preventDefault();
     room = document.getElementById('roomInput').value.trim(); //trim the input to remove any extra spaces
     if(!room) return alert("Please enter a room name");
 
@@ -144,53 +145,63 @@ function joinRoom() {
 
 
     //To access the local media devices
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-    .then(stream => {
+    navigator.mediaDevices.getUserMedia({ video: true, audio: { channelCount: 1, sampleRate: 16000 } })
+        .then(stream => {
         localStream = stream;
         document.getElementById('localVideo').srcObject = stream;
         mediaready = true; //Set the media ready flag to true
         console.log('Media devices ready');
 
         async function startTranscription(callId) {
+            if (!window.AudioWorklet) {
+                console.error("AudioWorklet is not supported in this browser");
+                alert("Your browser does not support AudioWorklet. Please use a modern browser.");
+                return;
+            }
             
             const isDocker = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
             const SPEECH_URL = getSrviceUrl('speech'); 
-            speechSocket = io(SPEECH_URL);
-
-            const targetLang =  document.getElementById('targetLanguage').value || 'en'; 
+            console.log("Connecting to speech service at:", SPEECH_URL);
+            speechSocket = io(SPEECH_URL, { reconnectionAttempts: 5, reconnectionDelay: 5000 });
+            const targetLang =  document.getElementById('targetLanguage').value; 
 
             
             speechSocket.on('connect', async () => {
+                console.log("Connected to speech service");
                 speechSocket.emit('start_transcription', { call_id: callId, target_lang: targetLang });
                 isTranscribing = true;
-        
-                const audioContext = new AudioContext();
-                await audioContext.audioWorklet.addModule('/static/js/processor.js');
 
-                if (audioContext.state === 'suspended') {
-                    await audioContext.resume();
-                }
-        
-                const processor = new AudioWorkletNode(audioContext, 'audio-processor');
-        
-                processor.port.onmessage = (event) => {
-                    const audioData = event.data;
-                    if (isTranscribing && Date.now() - lastSend > 250) {
-                        if (audioData && audioData.length > 0) {
-                            speechSocket.emit('audio_chunk', {
-                                audio: Array.from(audioData),  
-                                call_id: callId,
-                                target_lang: targetLang 
-                            });
-                            lastSend = Date.now();
-                        }
+                try {
+                    const audioContext = new AudioContext({ sampleRate: 16000 });
+                    await audioContext.audioWorklet.addModule('/static/js/processor.js');
+                    if (audioContext.state === 'suspended') {
+                        await audioContext.resume();
                     }
-                };
         
-                const source = audioContext.createMediaStreamSource(localStream);
-                source.connect(processor);
-                processor.connect(audioContext.destination);
-            });
+                    const processor = new AudioWorkletNode(audioContext, 'audio-processor');
+        
+                    processor.port.onmessage = (event) => {
+                        const audioData = event.data;
+                        if (isTranscribing && Date.now() - lastSend > 250) {
+                            if (audioData && audioData.length > 0) {
+                                speechSocket.emit('audio_chunk', {
+                                    audio: Array.from(audioData),  
+                                    call_id: callId,
+                                    target_lang: targetLang 
+                                });
+                                lastSend = Date.now();
+                            }
+                        }
+                    };
+            
+                    const source = audioContext.createMediaStreamSource(localStream);
+                    source.connect(processor);
+                    processor.connect(audioContext.destination);
+            } catch (err) {
+                console.error("Error setting up AudioWorklet:", err);
+                speechSocket.emit('transcription_error', { call_id: callId, error: 'AudioWorklet setup failed: ' + err.message });
+            }
+        });
         
             speechSocket.on('connect_error', (err) => {
                 console.error("Speech service connection failed:", err);
@@ -465,8 +476,6 @@ function displaySubtitle(text, type = 'original') {
 
 
 const AUTH_API = getSrviceUrl('auth');
-
-
 
 
 
