@@ -26,8 +26,8 @@ The goal of this project is to make online meetings more **accessible**, **inclu
 - Tailwind CSS
 
 ### Backend
-- Node.js
-- Express
+- Python 
+- Flask
 - WebSocket / Socket.IO
 
 ### Speech & Translation
