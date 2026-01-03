@@ -1,4 +1,6 @@
 # Connect – Real-Time Video Conferencing with Live Subtitles & Translation
+⚠️ This is an educational/demo project.
+It is NOT intended for real financial use.
 
 Connect is a modern video conferencing application that provides **real-time video calls**, **live subtitles**, and **instant speech translation** to enable seamless communication across languages.
 
@@ -41,3 +43,4 @@ The goal of this project is to make online meetings more **accessible**, **inclu
 ---
 
 ## 🏗️ Architecture Overview
+
